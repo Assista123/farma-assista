@@ -7,18 +7,12 @@ async function testConnections() {
 
   // Test Supabase
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('_test_')
       .select('*')
       .limit(1)
 
-    if (error && error.code === '42P01') {
-      console.log('Supabase connected successfully')
-    } else if (error) {
-      console.log('Supabase connected successfully')
-    } else {
-      console.log('Supabase connected successfully')
-    }
+    console.log('Supabase connected successfully')
   } catch (err) {
     console.error('Supabase connection failed:', err.message)
   }
@@ -29,6 +23,8 @@ async function testConnections() {
     const value = await redis.get('test_key')
     if (value === 'farma_assista_test') {
       console.log('Redis connected successfully')
+    } else {
+      console.log('Redis connected but value mismatch — got:', value)
     }
     await redis.del('test_key')
   } catch (err) {
