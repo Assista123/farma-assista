@@ -16,6 +16,10 @@ const {
   startFeedLogging,
   handleFeedLoggingStep
 } = require('../flows/feedLogging')
+const {
+  startMortalityLogging,
+  handleMortalityStep
+} = require('../flows/mortalityLogging')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
@@ -76,16 +80,16 @@ bot.on('message:text', async (ctx) => {
         const undoEntry = await getUndoEntry(farmerId)
 
         if (!undoEntry) {
-        await ctx.reply(
-          'The 5-minute undo window has passed — this entry can no longer be removed automatically.\n\n' +
-          'If you need to correct an older entry, send us a message describing the error and we will fix it for you.\n\n' +
-          'Format: "Correction — [what needs to be fixed]"\n\n' +
-          'For example: "Correction — I logged 15kg feed consumption but it should be 12kg for June Flock on 22 June"'
-        )
-        session.current_flow = null
-        await saveSession(farmerId, session)
-        return
-      }
+          await ctx.reply(
+            'The 5-minute undo window has passed — this entry can no longer be removed automatically.\n\n' +
+            'If you need to correct an older entry, send us a message describing the error and we will fix it for you.\n\n' +
+            'Format: "Correction — [what needs to be fixed]"\n\n' +
+            'For example: "Correction — I logged 15kg feed consumption but it should be 12kg for June Flock on 22 June"'
+          )
+          session.current_flow = null
+          await saveSession(farmerId, session)
+          return
+        }
 
         const deleted = await deleteRecord(undoEntry.table, undoEntry.record_id)
 
@@ -146,6 +150,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'MORTALITY_LOGGING') {
+      await handleMortalityStep(ctx, session)
+      return
+    }
+
     // Handle menu buttons
     if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
@@ -175,6 +184,11 @@ bot.on('message:text', async (ctx) => {
 
     if (input === '🌾 Log Feed') {
       await startFeedLogging(ctx, session)
+      return
+    }
+
+    if (input === '💀 Log Mortality') {
+      await startMortalityLogging(ctx, session)
       return
     }
 
