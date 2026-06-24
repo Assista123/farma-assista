@@ -12,8 +12,14 @@ const {
   startFlockCreation,
   handleFlockCreationStep
 } = require('../flows/flockCreation')
+const {
+  startFeedLogging,
+  handleFeedLoggingStep
+} = require('../flows/feedLogging')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
+const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
+const { deleteRecord } = require('../services/undoService')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -23,7 +29,6 @@ if (!token) {
 
 const bot = new Bot(token)
 
-// Handle all text messages
 bot.on('message:text', async (ctx) => {
   const farmerId = ctx.from.id.toString()
   const input = ctx.message.text.trim()
@@ -37,7 +42,6 @@ bot.on('message:text', async (ctx) => {
       await saveSession(farmerId, session)
     }
 
-    // Update last active
     session.last_active = new Date().toISOString()
 
     // Is farmer registered?
@@ -45,7 +49,6 @@ bot.on('message:text', async (ctx) => {
       const existingFarmer = await getFarmerByPhone(farmerId)
 
       if (existingFarmer) {
-        // Restore session from database
         const flocks = await getActiveFlocks(existingFarmer.id)
         session.is_registered = true
         session.farmer_name = existingFarmer.name
@@ -58,7 +61,6 @@ bot.on('message:text', async (ctx) => {
         }))
         await saveSession(farmerId, session)
       } else {
-        // New farmer
         if (session.current_flow === 'ONBOARDING') {
           await handleOnboardingStep(ctx, session)
         } else {
@@ -68,33 +70,96 @@ bot.on('message:text', async (ctx) => {
       }
     }
 
-    // Handle flock creation flow
+    // Handle undo confirmation first — before flow routing
+    if (session.current_flow === 'UNDO_CONFIRM') {
+      if (input === '✅ Yes, undo it') {
+        const undoEntry = await getUndoEntry(farmerId)
+
+        if (!undoEntry) {
+        await ctx.reply(
+          'The 5-minute undo window has passed — this entry can no longer be removed automatically.\n\n' +
+          'If you need to correct an older entry, send us a message describing the error and we will fix it for you.\n\n' +
+          'Format: "Correction — [what needs to be fixed]"\n\n' +
+          'For example: "Correction — I logged 15kg feed consumption but it should be 12kg for June Flock on 22 June"'
+        )
+        session.current_flow = null
+        await saveSession(farmerId, session)
+        return
+      }
+
+        const deleted = await deleteRecord(undoEntry.table, undoEntry.record_id)
+
+        await clearUndoEntry(farmerId)
+        session.current_flow = null
+        await saveSession(farmerId, session)
+
+        if (deleted) {
+          await ctx.reply(
+            `✅ Entry removed successfully.\n\n` +
+            `${undoEntry.description} has been deleted.`,
+            {
+              reply_markup: {
+                keyboard: [
+                  [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
+                  [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
+                  [{ text: '💰 Profit Summary' }]
+                ],
+                resize_keyboard: true
+              }
+            }
+          )
+        } else {
+          await ctx.reply('Sorry, something went wrong. Please try again.')
+        }
+        return
+      }
+
+      if (input === '❌ No, keep it') {
+        session.current_flow = null
+        await saveSession(farmerId, session)
+
+        await ctx.reply(
+          'No problem — entry kept.',
+          {
+            reply_markup: {
+              keyboard: [
+                [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
+                [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
+                [{ text: '💰 Profit Summary' }]
+              ],
+              resize_keyboard: true
+            }
+          }
+        )
+        return
+      }
+    }
+
+    // Route to active flow
     if (session.current_flow === 'FLOCK_CREATION') {
       await handleFlockCreationStep(ctx, session)
       return
     }
 
-    // Handle broiler/layer selection after onboarding
-    if (
-      input === '🐔 Broiler' ||
-      input.toUpperCase() === 'BROILER'
-    ) {
+    if (session.current_flow === 'FEED_LOGGING') {
+      await handleFeedLoggingStep(ctx, session)
+      return
+    }
+
+    // Handle menu buttons
+    if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
       return
     }
 
-    if (
-      input === '🥚 Layer' ||
-      input.toUpperCase() === 'LAYER'
-    ) {
+    if (input === '🥚 Layer' || input.toUpperCase() === 'LAYER') {
       await startFlockCreation(ctx, session, 'LAYER')
       return
     }
 
     if (input === 'I have both') {
       await ctx.reply(
-        `No problem! Let us add them one at a time.\n\n` +
-        `Which flock do you want to add first?`,
+        'No problem! Let us add them one at a time.\n\nWhich flock do you want to add first?',
         {
           reply_markup: {
             keyboard: [
@@ -108,10 +173,58 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Farmer is registered — show main menu
+    if (input === '🌾 Log Feed') {
+      await startFeedLogging(ctx, session)
+      return
+    }
+
+    // Handle undo
+    if (input === '↩️ Undo last entry') {
+      const undoEntry = await getUndoEntry(farmerId)
+
+      if (!undoEntry) {
+        await ctx.reply(
+          'Nothing to undo — either there is no recent entry or the 5-minute undo window has passed.\n\n' +
+          'To correct an older entry send us a message like this:\n\n' +
+          '"Correction — [what needs to be fixed]"\n\n' +
+          'For example: "Correction — I logged 15kg feed but it should be 12kg for June Flock on 22 June"',
+          {
+            reply_markup: {
+              keyboard: [
+                [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
+                [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
+                [{ text: '💰 Profit Summary' }]
+              ],
+              resize_keyboard: true
+            }
+          }
+        )
+        return
+      }
+
+      await ctx.reply(
+        `Are you sure you want to undo this entry?\n\n` +
+        `❌ ${undoEntry.description}\n\n` +
+        `This cannot be reversed.`,
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: '✅ Yes, undo it' }, { text: '❌ No, keep it' }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        }
+      )
+
+      session.current_flow = 'UNDO_CONFIRM'
+      await saveSession(farmerId, session)
+      return
+    }
+
+    // Default — show main menu
     await ctx.reply(
-      `Hello ${session.farmer_name}! 👋\n\n` +
-      `What would you like to do today?`,
+      `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
       {
         reply_markup: {
           keyboard: [
@@ -126,13 +239,10 @@ bot.on('message:text', async (ctx) => {
 
   } catch (err) {
     console.error('Bot error:', err.message)
-    await ctx.reply(
-      'Sorry, something went wrong. Please try again in a moment.'
-    )
+    await ctx.reply('Sorry, something went wrong. Please try again in a moment.')
   }
 })
 
-// Handle errors
 bot.catch((err) => {
   console.error('Bot error:', err)
 })
