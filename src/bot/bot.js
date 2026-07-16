@@ -20,6 +20,10 @@ const {
   startMortalityLogging,
   handleMortalityStep
 } = require('../flows/mortalityLogging')
+const {
+  startSalesLogging,
+  handleSalesStep
+} = require('../flows/salesLogging')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
@@ -105,8 +109,8 @@ bot.on('message:text', async (ctx) => {
               reply_markup: {
                 keyboard: [
                   [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-                  [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-                  [{ text: '💰 Profit Summary' }]
+                  [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+                  [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
                 ],
                 resize_keyboard: true
               }
@@ -128,8 +132,8 @@ bot.on('message:text', async (ctx) => {
             reply_markup: {
               keyboard: [
                 [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-                [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-                [{ text: '💰 Profit Summary' }]
+                [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+                [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
               ],
               resize_keyboard: true
             }
@@ -152,6 +156,11 @@ bot.on('message:text', async (ctx) => {
 
     if (session.current_flow === 'MORTALITY_LOGGING') {
       await handleMortalityStep(ctx, session)
+      return
+    }
+
+    if (session.current_flow === 'SALES_LOGGING') {
+      await handleSalesStep(ctx, session)
       return
     }
 
@@ -192,6 +201,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (input === '💵 Log Sales') {
+      await startSalesLogging(ctx, session)
+      return
+    }
+
     // Handle undo
     if (input === '↩️ Undo last entry') {
       const undoEntry = await getUndoEntry(farmerId)
@@ -206,8 +220,8 @@ bot.on('message:text', async (ctx) => {
             reply_markup: {
               keyboard: [
                 [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-                [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-                [{ text: '💰 Profit Summary' }]
+                [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+                [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
               ],
               resize_keyboard: true
             }
@@ -243,8 +257,8 @@ bot.on('message:text', async (ctx) => {
         reply_markup: {
           keyboard: [
             [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-            [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-            [{ text: '💰 Profit Summary' }]
+            [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+            [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
           ],
           resize_keyboard: true
         }

@@ -82,12 +82,15 @@ async function handleFeedLoggingStep(ctx, session) {
 
     if (flockType === 'BROILER') {
       feedTypes = [
-        [{ text: 'Starter' }, { text: 'Grower' }],
-        [{ text: 'Finisher' }]
+        [{ text: 'Starter (0-2 weeks)' }],
+        [{ text: 'Grower (2-4 weeks)' }],
+        [{ text: 'Finisher (4-8 weeks)' }]
       ]
     } else {
       feedTypes = [
-        [{ text: 'Layer Mash' }]
+        [{ text: 'Starter (0-8 weeks)' }],
+        [{ text: 'Grower (8-18 weeks)' }],
+        [{ text: 'Layer (18 weeks+)' }]
       ]
     }
 
@@ -107,10 +110,12 @@ async function handleFeedLoggingStep(ctx, session) {
   // ASK_FEED_TYPE
   if (currentStep === 'ASK_FEED_TYPE') {
     const feedTypeMap = {
-      'Starter': 'STARTER',
-      'Grower': 'GROWER',
-      'Finisher': 'FINISHER',
-      'Layer Mash': 'LAYER_MASH'
+      'Starter (0-2 weeks)': 'STARTER',
+      'Grower (2-4 weeks)': 'GROWER',
+      'Finisher (4-8 weeks)': 'FINISHER',
+      'Starter (0-8 weeks)': 'LAYER_STARTER',
+      'Grower (8-18 weeks)': 'LAYER_GROWER',
+      'Layer (18 weeks+)': 'LAYER'
     }
 
     const feedType = feedTypeMap[input]
@@ -139,12 +144,11 @@ async function handleFeedLoggingStep(ctx, session) {
         }
       )
     } else {
-      // Consumption always in kg
       session.current_step = 'ASK_QUANTITY_KG'
       await saveSession(session.farmer_id, session)
 
       await ctx.reply(
-        `How many kg of ${input} feed did the birds consume today?\n\n` +
+        `How many kg of ${input} did the birds consume today?\n\n` +
         `Enter just the number. For example: 12.5`
       )
     }
@@ -312,12 +316,15 @@ async function askWhichFlock(ctx, session) {
 
     if (flockType === 'BROILER') {
       feedTypes = [
-        [{ text: 'Starter' }, { text: 'Grower' }],
-        [{ text: 'Finisher' }]
+        [{ text: 'Starter (0-2 weeks)' }],
+        [{ text: 'Grower (2-4 weeks)' }],
+        [{ text: 'Finisher (4-8 weeks)' }]
       ]
     } else {
       feedTypes = [
-        [{ text: 'Layer Mash' }]
+        [{ text: 'Starter (0-8 weeks)' }],
+        [{ text: 'Grower (8-18 weeks)' }],
+        [{ text: 'Layer (18 weeks+)' }]
       ]
     }
 
@@ -380,7 +387,7 @@ async function saveFeedPurchase(ctx, session) {
 
   await ctx.reply(
     `✅ Feed purchase recorded!\n\n` +
-    `🌾 ${bagsText} of ${data.feed_type} feed\n` +
+    `🌾 ${bagsText} of ${data.feed_type}\n` +
     `💰 ₦${data.cost_naira.toLocaleString()}\n` +
     `📊 ₦${costPerKg} per kg\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
@@ -389,8 +396,8 @@ async function saveFeedPurchase(ctx, session) {
       reply_markup: {
         keyboard: [
           [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-          [{ text: '💰 Profit Summary' }]
+          [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
         ],
         resize_keyboard: true
       }
@@ -415,13 +422,12 @@ async function saveFeedConsumption(ctx, session) {
     return
   }
 
-  // Save undo entry
   const { saveUndoEntry } = require('../utils/undoManager')
   await saveUndoEntry(session.farmer_id, {
     type: 'FEED_CONSUMPTION',
     record_id: consumption.id,
     table: 'feed_consumption_logs',
-    description: `${data.quantity_kg}kg ${data.feed_type} feed for ${data.flock_name}`
+    description: `${data.quantity_kg}kg ${data.feed_type} for ${data.flock_name}`
   })
 
   const summary = await getFeedSummary(data.flock_id)
@@ -443,7 +449,7 @@ async function saveFeedConsumption(ctx, session) {
 
   await ctx.reply(
     `✅ Feed consumption recorded!\n\n` +
-    `🌾 ${data.quantity_kg}kg ${data.feed_type} feed\n` +
+    `🌾 ${data.quantity_kg}kg ${data.feed_type}\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
     `${stockMessage}\n\n` +
     `What would you like to do next?`,
@@ -451,8 +457,8 @@ async function saveFeedConsumption(ctx, session) {
       reply_markup: {
         keyboard: [
           [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-          [{ text: '💰 Profit Summary' }],
+          [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
           [{ text: '↩️ Undo last entry' }]
         ],
         resize_keyboard: true
@@ -494,8 +500,8 @@ async function showFeedStock(ctx, session) {
     reply_markup: {
       keyboard: [
         [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-        [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-        [{ text: '💰 Profit Summary' }]
+        [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+        [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
       ],
       resize_keyboard: true
     }
