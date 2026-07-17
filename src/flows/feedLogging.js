@@ -109,6 +109,8 @@ async function handleFeedLoggingStep(ctx, session) {
 
   // ASK_FEED_TYPE
   if (currentStep === 'ASK_FEED_TYPE') {
+    console.log('ASK_FEED_TYPE received input:', JSON.stringify(input))
+
     const feedTypeMap = {
       'Starter (0-2 weeks)': 'STARTER',
       'Grower (2-4 weeks)': 'GROWER',
@@ -126,90 +128,21 @@ async function handleFeedLoggingStep(ctx, session) {
     }
 
     session.collected_data.feed_type = feedType
-    session.current_step = 'ASK_QUANTITY_UNIT'
+    session.current_step = 'ASK_QUANTITY_KG'
     await saveSession(session.farmer_id, session)
 
     if (session.collected_data.action === 'PURCHASE') {
       await ctx.reply(
-        'How do you want to enter the quantity?',
-        {
-          reply_markup: {
-            keyboard: [
-              [{ text: '📦 In bags (25kg each)' }],
-              [{ text: '⚖️ In kg' }]
-            ],
-            resize_keyboard: true,
-            one_time_keyboard: true
-          }
-        }
+        `How many kg of feed did you buy?\n\n` +
+        `💡 Tip: multiply bags × kg per bag\n` +
+        `e.g. 10 bags of 25kg = 250kg\n\n` +
+        `Enter just the number. For example: 250`
       )
     } else {
-      session.current_step = 'ASK_QUANTITY_KG'
-      await saveSession(session.farmer_id, session)
-
       await ctx.reply(
-        `How many kg of ${input} did the birds consume today?\n\n` +
+        `How many kg did the birds consume today?\n\n` +
         `Enter just the number. For example: 12.5`
       )
-    }
-    return
-  }
-
-  // ASK_QUANTITY_UNIT
-  if (currentStep === 'ASK_QUANTITY_UNIT') {
-    if (input === '📦 In bags (25kg each)') {
-      session.current_step = 'ASK_QUANTITY_BAGS'
-      await saveSession(session.farmer_id, session)
-
-      await ctx.reply(
-        'How many bags did you buy?\n\n' +
-        'Enter just the number. For example: 10'
-      )
-      return
-    }
-
-    if (input === '⚖️ In kg') {
-      session.current_step = 'ASK_QUANTITY_KG'
-      await saveSession(session.farmer_id, session)
-
-      await ctx.reply(
-        'How many kg?\n\n' +
-        'Enter just the number. For example: 50'
-      )
-      return
-    }
-
-    await ctx.reply('Please use the buttons to select an option.')
-    return
-  }
-
-  // ASK_QUANTITY_BAGS
-  if (currentStep === 'ASK_QUANTITY_BAGS') {
-    const bags = parseFloat(input)
-
-    if (isNaN(bags) || bags <= 0) {
-      await ctx.reply(
-        'Please enter a valid number of bags.\n' +
-        'For example: 10'
-      )
-      return
-    }
-
-    const quantityKg = bags * 25
-    session.collected_data.quantity_kg = quantityKg
-    session.collected_data.bags = bags
-
-    if (session.collected_data.action === 'PURCHASE') {
-      session.current_step = 'ASK_COST'
-      await saveSession(session.farmer_id, session)
-
-      await ctx.reply(
-        `Got it — ${bags} bags = ${quantityKg}kg. 👍\n\n` +
-        `How much did you pay in total?\n\n` +
-        `Enter the amount in Naira. For example: 25000`
-      )
-    } else {
-      await saveFeedConsumption(ctx, session)
     }
     return
   }
@@ -233,8 +166,10 @@ async function handleFeedLoggingStep(ctx, session) {
       await saveSession(session.farmer_id, session)
 
       await ctx.reply(
-        `How much did you pay for ${quantity}kg?\n\n` +
-        `Enter the amount in Naira. For example: 25000`
+        `How much did you pay in total?\n\n` +
+        `💡 Tip: if you know the price per bag, multiply by number of bags\n` +
+        `e.g. 10 bags × ₦7,500 per bag = ₦75,000\n\n` +
+        `Enter the total amount in Naira. For example: 75000`
       )
     } else {
       await saveFeedConsumption(ctx, session)
@@ -259,15 +194,12 @@ async function handleFeedLoggingStep(ctx, session) {
     await saveSession(session.farmer_id, session)
 
     const data = session.collected_data
-    const bagsText = data.bags
-      ? `${data.bags} bags (${data.quantity_kg}kg)`
-      : `${data.quantity_kg}kg`
     const costPerKg = (cost / data.quantity_kg).toFixed(0)
 
     await ctx.reply(
       `Please confirm your feed purchase:\n\n` +
-      `🌾 Feed: ${data.feed_type}\n` +
-      `📦 Quantity: ${bagsText}\n` +
+      `🌾 Feed type: ${data.feed_type}\n` +
+      `📦 Quantity: ${data.quantity_kg}kg\n` +
       `💰 Amount: ₦${cost.toLocaleString()}\n` +
       `📊 Cost per kg: ₦${costPerKg}\n` +
       `🐔 Flock: ${data.flock_name}\n\n` +
@@ -381,13 +313,11 @@ async function saveFeedPurchase(ctx, session) {
   await saveSession(session.farmer_id, session)
 
   const costPerKg = (data.cost_naira / data.quantity_kg).toFixed(0)
-  const bagsText = data.bags
-    ? `${data.bags} bags (${data.quantity_kg}kg)`
-    : `${data.quantity_kg}kg`
 
   await ctx.reply(
     `✅ Feed purchase recorded!\n\n` +
-    `🌾 ${bagsText} of ${data.feed_type}\n` +
+    `🌾 Feed type: ${data.feed_type}\n` +
+    `📦 Quantity: ${data.quantity_kg}kg\n` +
     `💰 ₦${data.cost_naira.toLocaleString()}\n` +
     `📊 ₦${costPerKg} per kg\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
@@ -441,7 +371,19 @@ async function saveFeedConsumption(ctx, session) {
   session.collected_data = {}
   await saveSession(session.farmer_id, session)
 
-  let stockMessage = `📦 Current stock: ${summary.current_stock_kg.toFixed(1)}kg`
+  const stockKg = summary.current_stock_kg
+  const fullBags = Math.floor(stockKg / 25)
+  const remainderKg = stockKg % 25
+  let stockDisplay = ''
+  if (fullBags > 0 && remainderKg > 0) {
+    stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} + ${remainderKg.toFixed(1)}kg`
+  } else if (fullBags > 0) {
+    stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} (${stockKg.toFixed(1)}kg)`
+  } else {
+    stockDisplay = `${stockKg.toFixed(1)}kg`
+  }
+
+  let stockMessage = `📦 Current stock: ${stockDisplay}`
   if (daysRemaining !== null) {
     const indicator = daysRemaining <= 3 ? '⚠️' : '✅'
     stockMessage += `\n${indicator} ~${daysRemaining} days remaining`
@@ -483,8 +425,21 @@ async function showFeedStock(ctx, session) {
       ? Math.floor(summary.current_stock_kg / dailyRate)
       : null
 
+    const stockKg = summary.current_stock_kg
+    const fullBags = Math.floor(stockKg / 25)
+    const remainderKg = stockKg % 25
+
+    let stockDisplay = ''
+    if (fullBags > 0 && remainderKg > 0) {
+      stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} + ${remainderKg.toFixed(1)}kg`
+    } else if (fullBags > 0) {
+      stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} (${stockKg.toFixed(1)}kg)`
+    } else {
+      stockDisplay = `${stockKg.toFixed(1)}kg`
+    }
+
     message += `🐔 ${flock.flock_name}\n`
-    message += `   Stock: ${summary.current_stock_kg.toFixed(1)}kg\n`
+    message += `   Stock: ${stockDisplay}\n`
     if (daysRemaining !== null) {
       const indicator = daysRemaining <= 3 ? '⚠️' : '✅'
       message += `   ${indicator} ~${daysRemaining} days remaining\n`
