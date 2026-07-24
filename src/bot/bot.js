@@ -37,12 +37,24 @@ if (!token) {
 
 const bot = new Bot(token)
 
+// Standard main menu keyboard — used everywhere
+const mainMenuKeyboard = {
+  reply_markup: {
+    keyboard: [
+      [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
+      [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
+      [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
+      [{ text: '🏠 Main Menu' }]
+    ],
+    resize_keyboard: true
+  }
+}
+
 bot.on('message:text', async (ctx) => {
   const farmerId = ctx.from.id.toString()
   const input = ctx.message.text.trim()
 
   try {
-    // Load or create session
     let session = await getSession(farmerId)
 
     if (!session) {
@@ -78,7 +90,7 @@ bot.on('message:text', async (ctx) => {
       }
     }
 
-    // Handle undo confirmation first — before flow routing
+    // Handle undo confirmation first
     if (session.current_flow === 'UNDO_CONFIRM') {
       if (input === '✅ Yes, undo it') {
         const undoEntry = await getUndoEntry(farmerId)
@@ -88,7 +100,8 @@ bot.on('message:text', async (ctx) => {
             'The 5-minute undo window has passed — this entry can no longer be removed automatically.\n\n' +
             'If you need to correct an older entry, send us a message describing the error and we will fix it for you.\n\n' +
             'Format: "Correction — [what needs to be fixed]"\n\n' +
-            'For example: "Correction — I logged 15kg feed consumption but it should be 12kg for June Flock on 22 June"'
+            'For example: "Correction — I logged 15kg feed consumption but it should be 12kg for June Flock on 22 June"',
+            mainMenuKeyboard
           )
           session.current_flow = null
           await saveSession(farmerId, session)
@@ -96,25 +109,14 @@ bot.on('message:text', async (ctx) => {
         }
 
         const deleted = await deleteRecord(undoEntry.table, undoEntry.record_id)
-
         await clearUndoEntry(farmerId)
         session.current_flow = null
         await saveSession(farmerId, session)
 
         if (deleted) {
           await ctx.reply(
-            `✅ Entry removed successfully.\n\n` +
-            `${undoEntry.description} has been deleted.`,
-            {
-              reply_markup: {
-                keyboard: [
-                  [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-                  [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-                  [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
-                ],
-                resize_keyboard: true
-              }
-            }
+            `✅ Entry removed successfully.\n\n${undoEntry.description} has been deleted.`,
+            mainMenuKeyboard
           )
         } else {
           await ctx.reply('Sorry, something went wrong. Please try again.')
@@ -125,22 +127,23 @@ bot.on('message:text', async (ctx) => {
       if (input === '❌ No, keep it') {
         session.current_flow = null
         await saveSession(farmerId, session)
-
-        await ctx.reply(
-          'No problem — entry kept.',
-          {
-            reply_markup: {
-              keyboard: [
-                [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-                [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-                [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
-              ],
-              resize_keyboard: true
-            }
-          }
-        )
+        await ctx.reply('No problem — entry kept.', mainMenuKeyboard)
         return
       }
+    }
+
+    // Global exit — cancel any active flow
+    if (
+      input.toLowerCase() === 'cancel' ||
+      input.toLowerCase() === 'menu' ||
+      input === '🏠 Main Menu'
+    ) {
+      session.current_flow = null
+      session.current_step = null
+      session.collected_data = {}
+      await saveSession(farmerId, session)
+      await ctx.reply(`No problem! What would you like to do?`, mainMenuKeyboard)
+      return
     }
 
     // Route to active flow
@@ -181,10 +184,10 @@ bot.on('message:text', async (ctx) => {
         {
           reply_markup: {
             keyboard: [
-              [{ text: '🐔 Broiler' }, { text: '🥚 Layer' }]
+              [{ text: '🐔 Broiler' }, { text: '🥚 Layer' }],
+              [{ text: '🏠 Main Menu' }]
             ],
-            resize_keyboard: true,
-            one_time_keyboard: true
+            resize_keyboard: true
           }
         }
       )
@@ -216,16 +219,7 @@ bot.on('message:text', async (ctx) => {
           'To correct an older entry send us a message like this:\n\n' +
           '"Correction — [what needs to be fixed]"\n\n' +
           'For example: "Correction — I logged 15kg feed but it should be 12kg for June Flock on 22 June"',
-          {
-            reply_markup: {
-              keyboard: [
-                [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-                [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-                [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
-              ],
-              resize_keyboard: true
-            }
-          }
+          mainMenuKeyboard
         )
         return
       }
@@ -237,10 +231,10 @@ bot.on('message:text', async (ctx) => {
         {
           reply_markup: {
             keyboard: [
-              [{ text: '✅ Yes, undo it' }, { text: '❌ No, keep it' }]
+              [{ text: '✅ Yes, undo it' }, { text: '❌ No, keep it' }],
+              [{ text: '🏠 Main Menu' }]
             ],
-            resize_keyboard: true,
-            one_time_keyboard: true
+            resize_keyboard: true
           }
         }
       )
@@ -253,16 +247,7 @@ bot.on('message:text', async (ctx) => {
     // Default — show main menu
     await ctx.reply(
       `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
-      {
-        reply_markup: {
-          keyboard: [
-            [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-            [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-            [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
-          ],
-          resize_keyboard: true
-        }
-      }
+      mainMenuKeyboard
     )
 
   } catch (err) {

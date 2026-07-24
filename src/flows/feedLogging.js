@@ -6,7 +6,6 @@ const {
 } = require('../services/feedService')
 const { saveSession } = require('../utils/sessionManager')
 
-// Start feed logging — ask purchase or consumption
 async function startFeedLogging(ctx, session) {
   session.current_flow = 'FEED_LOGGING'
   session.current_step = 'ASK_FEED_ACTION'
@@ -14,27 +13,24 @@ async function startFeedLogging(ctx, session) {
   await saveSession(session.farmer_id, session)
 
   await ctx.reply(
-    '🌾 Feed Logging\n\n' +
-    'What would you like to log?',
+    '🌾 Feed Logging\n\nWhat would you like to log?',
     {
       reply_markup: {
         keyboard: [
           [{ text: '🛒 I bought feed' }, { text: '🍽️ I fed the birds' }],
-          [{ text: '📊 Check feed stock' }]
+          [{ text: '📊 Check feed stock' }],
+          [{ text: '🏠 Main Menu' }]
         ],
-        resize_keyboard: true,
-        one_time_keyboard: true
+        resize_keyboard: true
       }
     }
   )
 }
 
-// Handle each step
 async function handleFeedLoggingStep(ctx, session) {
   const input = ctx.message.text.trim()
   const currentStep = session.current_step
 
-  // ASK_FEED_ACTION
   if (currentStep === 'ASK_FEED_ACTION') {
     if (input === '🛒 I bought feed') {
       session.collected_data.action = 'PURCHASE'
@@ -61,11 +57,8 @@ async function handleFeedLoggingStep(ctx, session) {
     return
   }
 
-  // ASK_FLOCK
   if (currentStep === 'ASK_FLOCK') {
-    const flock = session.active_flocks.find(
-      f => f.flock_name === input
-    )
+    const flock = session.active_flocks.find(f => f.flock_name === input)
 
     if (!flock) {
       await ctx.reply('Please select a flock from the options.')
@@ -84,30 +77,27 @@ async function handleFeedLoggingStep(ctx, session) {
       feedTypes = [
         [{ text: 'Starter (0-2 weeks)' }],
         [{ text: 'Grower (2-4 weeks)' }],
-        [{ text: 'Finisher (4-8 weeks)' }]
+        [{ text: 'Finisher (4-8 weeks)' }],
+        [{ text: '🏠 Main Menu' }]
       ]
     } else {
       feedTypes = [
         [{ text: 'Starter (0-8 weeks)' }],
         [{ text: 'Grower (8-18 weeks)' }],
-        [{ text: 'Layer (18 weeks+)' }]
+        [{ text: 'Layer (18 weeks+)' }],
+        [{ text: '🏠 Main Menu' }]
       ]
     }
 
-    await ctx.reply(
-      'What type of feed?',
-      {
-        reply_markup: {
-          keyboard: feedTypes,
-          resize_keyboard: true,
-          one_time_keyboard: true
-        }
+    await ctx.reply('What type of feed?', {
+      reply_markup: {
+        keyboard: feedTypes,
+        resize_keyboard: true
       }
-    )
+    })
     return
   }
 
-  // ASK_FEED_TYPE
   if (currentStep === 'ASK_FEED_TYPE') {
     console.log('ASK_FEED_TYPE received input:', JSON.stringify(input))
 
@@ -147,15 +137,11 @@ async function handleFeedLoggingStep(ctx, session) {
     return
   }
 
-  // ASK_QUANTITY_KG
   if (currentStep === 'ASK_QUANTITY_KG') {
     const quantity = parseFloat(input)
 
     if (isNaN(quantity) || quantity <= 0) {
-      await ctx.reply(
-        'Please enter a valid quantity in kg.\n' +
-        'For example: 50'
-      )
+      await ctx.reply('Please enter a valid quantity in kg.\nFor example: 50')
       return
     }
 
@@ -177,15 +163,11 @@ async function handleFeedLoggingStep(ctx, session) {
     return
   }
 
-  // ASK_COST (purchase only)
   if (currentStep === 'ASK_COST') {
     const cost = parseFloat(input)
 
     if (isNaN(cost) || cost <= 0) {
-      await ctx.reply(
-        'Please enter a valid amount in Naira.\n' +
-        'For example: 25000'
-      )
+      await ctx.reply('Please enter a valid amount in Naira.\nFor example: 25000')
       return
     }
 
@@ -207,17 +189,16 @@ async function handleFeedLoggingStep(ctx, session) {
       {
         reply_markup: {
           keyboard: [
-            [{ text: '✅ Yes, save it' }, { text: '❌ No, start over' }]
+            [{ text: '✅ Yes, save it' }, { text: '❌ No, start over' }],
+            [{ text: '🏠 Main Menu' }]
           ],
-          resize_keyboard: true,
-          one_time_keyboard: true
+          resize_keyboard: true
         }
       }
     )
     return
   }
 
-  // CONFIRM_PURCHASE
   if (currentStep === 'CONFIRM_PURCHASE') {
     if (input === '❌ No, start over') {
       await startFeedLogging(ctx, session)
@@ -234,7 +215,6 @@ async function handleFeedLoggingStep(ctx, session) {
   }
 }
 
-// Ask which flock
 async function askWhichFlock(ctx, session) {
   if (session.active_flocks.length === 1) {
     const flock = session.active_flocks[0]
@@ -250,13 +230,15 @@ async function askWhichFlock(ctx, session) {
       feedTypes = [
         [{ text: 'Starter (0-2 weeks)' }],
         [{ text: 'Grower (2-4 weeks)' }],
-        [{ text: 'Finisher (4-8 weeks)' }]
+        [{ text: 'Finisher (4-8 weeks)' }],
+        [{ text: '🏠 Main Menu' }]
       ]
     } else {
       feedTypes = [
         [{ text: 'Starter (0-8 weeks)' }],
         [{ text: 'Grower (8-18 weeks)' }],
-        [{ text: 'Layer (18 weeks+)' }]
+        [{ text: 'Layer (18 weeks+)' }],
+        [{ text: '🏠 Main Menu' }]
       ]
     }
 
@@ -265,31 +247,24 @@ async function askWhichFlock(ctx, session) {
       {
         reply_markup: {
           keyboard: feedTypes,
-          resize_keyboard: true,
-          one_time_keyboard: true
+          resize_keyboard: true
         }
       }
     )
     return
   }
 
-  const flockButtons = session.active_flocks.map(
-    f => [{ text: f.flock_name }]
-  )
+  const flockButtons = session.active_flocks.map(f => [{ text: f.flock_name }])
+  flockButtons.push([{ text: '🏠 Main Menu' }])
 
-  await ctx.reply(
-    'Which flock is this for?',
-    {
-      reply_markup: {
-        keyboard: flockButtons,
-        resize_keyboard: true,
-        one_time_keyboard: true
-      }
+  await ctx.reply('Which flock is this for?', {
+    reply_markup: {
+      keyboard: flockButtons,
+      resize_keyboard: true
     }
-  )
+  })
 }
 
-// Save feed purchase
 async function saveFeedPurchase(ctx, session) {
   const data = session.collected_data
   const today = new Date().toISOString().split('T')[0]
@@ -327,7 +302,8 @@ async function saveFeedPurchase(ctx, session) {
         keyboard: [
           [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
           [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
+          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
+          [{ text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }
@@ -335,7 +311,6 @@ async function saveFeedPurchase(ctx, session) {
   )
 }
 
-// Save feed consumption
 async function saveFeedConsumption(ctx, session) {
   const data = session.collected_data
   const today = new Date().toISOString().split('T')[0]
@@ -401,7 +376,7 @@ async function saveFeedConsumption(ctx, session) {
           [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
           [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
           [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-          [{ text: '↩️ Undo last entry' }]
+          [{ text: '↩️ Undo last entry' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }
@@ -409,7 +384,6 @@ async function saveFeedConsumption(ctx, session) {
   )
 }
 
-// Show feed stock summary
 async function showFeedStock(ctx, session) {
   if (session.active_flocks.length === 0) {
     await ctx.reply('You have no active flocks.')
@@ -456,7 +430,8 @@ async function showFeedStock(ctx, session) {
       keyboard: [
         [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
         [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-        [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }]
+        [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
+        [{ text: '🏠 Main Menu' }]
       ],
       resize_keyboard: true
     }
