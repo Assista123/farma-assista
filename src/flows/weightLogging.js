@@ -2,6 +2,7 @@ const { logWeight, getBreedBenchmark } = require('../services/weightService')
 const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
+const { getFeedSummary } = require('../services/feedService')
 
 async function startWeightLogging(ctx, session) {
   const broilerFlocks = session.active_flocks.filter(f => f.type === 'BROILER')
@@ -256,12 +257,46 @@ async function saveWeight(ctx, session) {
       `\n\n💡 Tip: Add your flock breed during setup to get weight benchmarks and performance comparisons.`
   }
 
+  // Check feed logging consistency
+  const feedSummary = await getFeedSummary(data.flock_id)
+  const noFeedLogged = !feedSummary || feedSummary.total_consumed_kg === 0
+
+  let feedWarning = ''
+  if (noFeedLogged) {
+    feedWarning =
+      `\n\n💡 Note: No feed consumption has been logged for this flock yet. ` +
+      `For accurate FCR calculations log daily feed consumption.`
+  } else {
+    // Check how many days have been logged vs flock age
+    const flock = await getFlockById(data.flock_id)
+    const ageDays = getBirdAgeDays(flock.start_date)
+    const expectedLogs = ageDays
+    const { data: consumptionLogs } = await require('../config/database')
+      .from('feed_consumption_logs')
+      .select('date')
+      .eq('flock_id', data.flock_id)
+    
+    const actualLogs = consumptionLogs ? consumptionLogs.length : 0
+    const coveragePercent = Math.round((actualLogs / expectedLogs) * 100)
+
+    if (coveragePercent < 50) {
+      feedWarning =
+        `\n\n⚠️ Feed logging is sparse — only ${actualLogs} out of ~${expectedLogs} days logged (${coveragePercent}% coverage). ` +
+        `FCR calculations may not be accurate. Try to log feed consumption daily.`
+    } else if (coveragePercent < 80) {
+      feedWarning =
+        `\n\n💡 Feed logging coverage: ${coveragePercent}%. ` +
+        `For best FCR accuracy, aim to log feed consumption every day.`
+    }
+  }
+
   await ctx.reply(
     `✅ Weight recorded!\n\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `📅 Age: ${birdAgeDays} days\n` +
     `⚖️ Average weight: ${weight.average_weight_kg}kg` +
     benchmarkMessage +
+    feedWarning +
     `\n\nWhat would you like to do next?`,
     {
       reply_markup: {
