@@ -28,7 +28,10 @@ const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
 const { deleteRecord } = require('../services/undoService')
-
+const {
+  startWeightLogging,
+  handleWeightStep
+} = require('../flows/weightLogging')
 const token = process.env.TELEGRAM_BOT_TOKEN
 
 if (!token) {
@@ -42,9 +45,9 @@ const mainMenuKeyboard = {
   reply_markup: {
     keyboard: [
       [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-      [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-      [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-      [{ text: '🏠 Main Menu' }]
+      [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
+      [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
+      [{ text: '💰 Profit Summary' }, { text: '🏠 Main Menu' }]
     ],
     resize_keyboard: true
   }
@@ -167,6 +170,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'WEIGHT_LOGGING') {
+      await handleWeightStep(ctx, session)
+      return
+    }
+
     // Handle menu buttons
     if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
@@ -206,6 +214,11 @@ bot.on('message:text', async (ctx) => {
 
     if (input === '💵 Log Sales') {
       await startSalesLogging(ctx, session)
+      return
+    }
+
+    if (input === '⚖️ Log Weight') {
+      await startWeightLogging(ctx, session)
       return
     }
 
