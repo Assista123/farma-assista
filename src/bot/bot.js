@@ -40,6 +40,10 @@ const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
 const { deleteRecord } = require('../services/undoService')
+const {
+  startLitterLogging,
+  handleLitterStep
+} = require('../flows/litterLogging')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -55,9 +59,10 @@ const mainMenuKeyboard = {
     keyboard: [
       [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
       [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-      [{ text: '🥚 Log Eggs' }, { text: '📦 Check Stock' }],
-      [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-      [{ text: '🔒 Close Flock Cycle' }, { text: '🏠 Main Menu' }]
+      [{ text: '🥚 Log Eggs' }, { text: '🪹 Litter Check' }],
+      [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
+      [{ text: '💰 Profit Summary' }, { text: '🔒 Close Flock Cycle' }],
+      [{ text: '🏠 Main Menu' }]
     ],
     resize_keyboard: true
   }
@@ -195,6 +200,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'LITTER_LOGGING') {
+      await handleLitterStep(ctx, session)
+      return
+    }
+
     // Handle menu buttons
     if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
@@ -265,6 +275,11 @@ bot.on('message:text', async (ctx) => {
 
     if (input === '🔒 Close Flock Cycle') {
       await startCloseFlock(ctx, session)
+      return
+    }
+
+    if (input === '🪹 Litter Check') {
+      await startLitterLogging(ctx, session)
       return
     }
 
