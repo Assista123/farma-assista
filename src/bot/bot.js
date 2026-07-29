@@ -24,14 +24,23 @@ const {
   startSalesLogging,
   handleSalesStep
 } = require('../flows/salesLogging')
-const { getFarmerByPhone } = require('../services/farmerService')
-const { getActiveFlocks } = require('../services/flockService')
-const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
-const { deleteRecord } = require('../services/undoService')
 const {
   startWeightLogging,
   handleWeightStep
 } = require('../flows/weightLogging')
+const {
+  startEggProductionLogging,
+  handleEggProductionStep
+} = require('../flows/eggProductionLogging')
+const {
+  startCloseFlock,
+  handleCloseFlockStep
+} = require('../flows/closeFlock')
+const { getFarmerByPhone } = require('../services/farmerService')
+const { getActiveFlocks } = require('../services/flockService')
+const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
+const { deleteRecord } = require('../services/undoService')
+
 const token = process.env.TELEGRAM_BOT_TOKEN
 
 if (!token) {
@@ -46,8 +55,9 @@ const mainMenuKeyboard = {
     keyboard: [
       [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
       [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-      [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-      [{ text: '💰 Profit Summary' }, { text: '🏠 Main Menu' }]
+      [{ text: '🥚 Log Eggs' }, { text: '📦 Check Stock' }],
+      [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
+      [{ text: '🔒 Close Flock Cycle' }, { text: '🏠 Main Menu' }]
     ],
     resize_keyboard: true
   }
@@ -175,6 +185,16 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'EGG_PRODUCTION_LOGGING') {
+      await handleEggProductionStep(ctx, session)
+      return
+    }
+
+    if (session.current_flow === 'CLOSE_FLOCK') {
+      await handleCloseFlockStep(ctx, session)
+      return
+    }
+
     // Handle menu buttons
     if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
@@ -182,6 +202,22 @@ bot.on('message:text', async (ctx) => {
     }
 
     if (input === '🥚 Layer' || input.toUpperCase() === 'LAYER') {
+      await startFlockCreation(ctx, session, 'LAYER')
+      return
+    }
+
+    if (
+      input === '🐔 Start New Broiler Flock' ||
+      input === '🐔 Broiler'
+    ) {
+      await startFlockCreation(ctx, session, 'BROILER')
+      return
+    }
+
+    if (
+      input === '🥚 Start New Layer Flock' ||
+      input === '🥚 Layer'
+    ) {
       await startFlockCreation(ctx, session, 'LAYER')
       return
     }
@@ -219,6 +255,16 @@ bot.on('message:text', async (ctx) => {
 
     if (input === '⚖️ Log Weight') {
       await startWeightLogging(ctx, session)
+      return
+    }
+
+    if (input === '🥚 Log Eggs') {
+      await startEggProductionLogging(ctx, session)
+      return
+    }
+
+    if (input === '🔒 Close Flock Cycle') {
+      await startCloseFlock(ctx, session)
       return
     }
 
