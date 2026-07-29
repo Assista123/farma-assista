@@ -44,6 +44,10 @@ const {
   startLitterLogging,
   handleLitterStep
 } = require('../flows/litterLogging')
+const {
+  startDrugLogging,
+  handleDrugStep
+} = require('../flows/drugLogging')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -60,9 +64,9 @@ const mainMenuKeyboard = {
       [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
       [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
       [{ text: '🥚 Log Eggs' }, { text: '🪹 Litter Check' }],
-      [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-      [{ text: '💰 Profit Summary' }, { text: '🔒 Close Flock Cycle' }],
-      [{ text: '🏠 Main Menu' }]
+      [{ text: '💊 Log Drug' }, { text: '📦 Check Stock' }],
+      [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
+      [{ text: '🔒 Close Flock Cycle' }, { text: '🏠 Main Menu' }]
     ],
     resize_keyboard: true
   }
@@ -205,6 +209,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'DRUG_LOGGING') {
+      await handleDrugStep(ctx, session)
+      return
+    }
+
     // Handle menu buttons
     if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
@@ -280,6 +289,11 @@ bot.on('message:text', async (ctx) => {
 
     if (input === '🪹 Litter Check') {
       await startLitterLogging(ctx, session)
+      return
+    }
+
+    if (input === '💊 Log Drug') {
+      await startDrugLogging(ctx, session)
       return
     }
 
