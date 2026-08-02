@@ -2,22 +2,13 @@ const { getFlockById, closeFlock, updateBirdCount } = require('../services/flock
 const { getSalesSummary } = require('../services/salesService')
 const { getMortalitySummary } = require('../services/mortalityService')
 const { getFeedSummary } = require('../services/feedService')
-const { logBirdSale } = require('../services/salesService')
 const { logMortality, getTotalExpensesToDate } = require('../services/mortalityService')
 const { saveSession } = require('../utils/sessionManager')
-const supabase = require('../config/database')
+const { mainMenuKeyboard } = require('../utils/keyboards')
 
 async function startCloseFlock(ctx, session) {
   if (session.active_flocks.length === 0) {
-    await ctx.reply(
-      'You have no active flocks to close.',
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await ctx.reply('You have no active flocks to close.', mainMenuKeyboard)
     return
   }
 
@@ -242,7 +233,6 @@ async function handleCloseFlockStep(ctx, session) {
         value * session.collected_data.current_bird_count
     }
 
-    // Zero out bird count
     await updateBirdCount(session.collected_data.flock_id, 0)
     session.current_step = 'CONFIRM'
     await saveSession(session.farmer_id, session)
@@ -258,16 +248,13 @@ async function handleCloseFlockStep(ctx, session) {
     } else {
       stolenCount = parseInt(input)
       if (isNaN(stolenCount) || stolenCount <= 0) {
-        await ctx.reply(
-          'Please enter a valid number or tap All of them.'
-        )
+        await ctx.reply('Please enter a valid number or tap All of them.')
         return
       }
     }
 
     session.collected_data.stolen_count = stolenCount
 
-    // Log stolen birds as mortality with cause UNKNOWN
     const today = new Date().toISOString().split('T')[0]
     const totalExpenses = await getTotalExpensesToDate(
       session.collected_data.flock_id, today
@@ -289,7 +276,6 @@ async function handleCloseFlockStep(ctx, session) {
       actual_loss_naira: (costPerBird * stolenCount).toFixed(2)
     })
 
-    // Update bird count
     const remaining = session.collected_data.current_bird_count - stolenCount
     await updateBirdCount(session.collected_data.flock_id, remaining)
 
@@ -403,19 +389,7 @@ async function handleCloseFlockStep(ctx, session) {
       session.current_step = null
       session.collected_data = {}
       await saveSession(session.farmer_id, session)
-
-      await ctx.reply('No problem — cycle kept open.', {
-        reply_markup: {
-          keyboard: [
-            [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-            [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-            [{ text: '🥚 Log Eggs' }, { text: '📦 Check Stock' }],
-            [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-            [{ text: '🔒 Close Flock Cycle' }, { text: '🏠 Main Menu' }]
-          ],
-          resize_keyboard: true
-        }
-      })
+      await ctx.reply('No problem — cycle kept open.', mainMenuKeyboard)
       return
     }
 
@@ -471,13 +445,11 @@ async function showSummary(ctx, session) {
     (new Date(today) - new Date(startDate)) / (1000 * 60 * 60 * 24)
   )
 
-  // Include slaughter value in revenue if applicable
   const slaughterValue = data.slaughter_total_value || 0
   const totalRevenue = sales.total_revenue + slaughterValue
   const profit = totalRevenue - feed.total_cost_naira
   const profitLabel = profit >= 0 ? '✅ Profit' : '❌ Loss'
 
-  // Build additional notes
   let additionalNotes = ''
   if (data.slaughter_value_per_bird) {
     additionalNotes +=

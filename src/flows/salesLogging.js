@@ -377,9 +377,8 @@ async function saveSale(ctx, session) {
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-          [{ text: '💰 Profit Summary' }, { text: '↩️ Undo last entry' }]
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }

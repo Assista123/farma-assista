@@ -301,10 +301,8 @@ async function saveWeight(ctx, session) {
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-          [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-          [{ text: '💰 Profit Summary' }, { text: '🏠 Main Menu' }]
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }

@@ -34,22 +34,26 @@ async function startMortalityLogging(ctx, session) {
     await ctx.reply(
       `💀 Mortality Log — ${flock.flock_name}\n\n` +
       `Sorry to hear about the loss. 😔\n\n` +
-      `How many birds did you lose?`
+      `How many birds did you lose?`,
+      {
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
     )
     return
   }
 
-  const flockButtons = session.active_flocks.map(
-    f => [{ text: f.flock_name }]
-  )
+  const flockButtons = session.active_flocks.map(f => [{ text: f.flock_name }])
+  flockButtons.push([{ text: '🏠 Main Menu' }])
 
   await ctx.reply(
     '💀 Mortality Log\n\nWhich flock did you lose birds from?',
     {
       reply_markup: {
         keyboard: flockButtons,
-        resize_keyboard: true,
-        one_time_keyboard: true
+        resize_keyboard: true
       }
     }
   )
@@ -192,7 +196,6 @@ async function handleMortalityStep(ctx, session) {
   }
 }
 
-// Show confirmation screen
 async function showConfirmation(ctx, session) {
   const data = session.collected_data
   const causeLabel = CAUSES.find(
@@ -213,10 +216,10 @@ async function showConfirmation(ctx, session) {
     {
       reply_markup: {
         keyboard: [
-          [{ text: '✅ Yes, save it' }, { text: '❌ No, start over' }]
+          [{ text: '✅ Yes, save it' }, { text: '❌ No, start over' }],
+          [{ text: '🏠 Main Menu' }]
         ],
-        resize_keyboard: true,
-        one_time_keyboard: true
+        resize_keyboard: true
       }
     }
   )
@@ -305,17 +308,10 @@ async function saveMortality(ctx, session) {
     alertMessage,
     {
       reply_markup: {
-        keyboard: highMortality
-          ? [
-              [{ text: '❤️ Run Health Check' }, { text: '↩️ Undo last entry' }],
-              [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-              [{ text: '📦 Check Stock' }, { text: '💰 Profit Summary' }]
-            ]
-          : [
-              [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-              [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-              [{ text: '💰 Profit Summary' }, { text: '↩️ Undo last entry' }]
-            ],
+        keyboard: [
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
+        ],
         resize_keyboard: true
       }
     }

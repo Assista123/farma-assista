@@ -297,13 +297,13 @@ async function saveFeedPurchase(ctx, session) {
     `📊 ₦${costPerKg} per kg\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
     `What would you like to do next?`,
+
+    // saveFeedPurchase
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-          [{ text: '🏠 Main Menu' }]
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }
@@ -370,13 +370,13 @@ async function saveFeedConsumption(ctx, session) {
     `🐔 Flock: ${data.flock_name}\n\n` +
     `${stockMessage}\n\n` +
     `What would you like to do next?`,
+
+    // saveFeedConsumption 
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-          [{ text: '↩️ Undo last entry' }, { text: '🏠 Main Menu' }]
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }
@@ -428,10 +428,8 @@ async function showFeedStock(ctx, session) {
   await ctx.reply(message, {
     reply_markup: {
       keyboard: [
-        [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-        [{ text: '💵 Log Sales' }, { text: '📦 Check Stock' }],
-        [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-        [{ text: '🏠 Main Menu' }]
+        [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+        [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
       ],
       resize_keyboard: true
     }

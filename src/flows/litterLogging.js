@@ -369,11 +369,8 @@ async function saveLitterCondition(ctx, session) {
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-          [{ text: '🥚 Log Eggs' }, { text: '📦 Check Stock' }],
-          [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-          [{ text: '🔒 Close Flock Cycle' }, { text: '🏠 Main Menu' }]
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }

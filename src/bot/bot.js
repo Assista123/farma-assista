@@ -36,10 +36,6 @@ const {
   startCloseFlock,
   handleCloseFlockStep
 } = require('../flows/closeFlock')
-const { getFarmerByPhone } = require('../services/farmerService')
-const { getActiveFlocks } = require('../services/flockService')
-const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
-const { deleteRecord } = require('../services/undoService')
 const {
   startLitterLogging,
   handleLitterStep
@@ -48,6 +44,14 @@ const {
   startDrugLogging,
   handleDrugStep
 } = require('../flows/drugLogging')
+const {
+  startExpenseLogging,
+  handleExpenseStep
+} = require('../flows/expenseLogging')
+const { getFarmerByPhone } = require('../services/farmerService')
+const { getActiveFlocks } = require('../services/flockService')
+const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
+const { deleteRecord } = require('../services/undoService')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -57,16 +61,46 @@ if (!token) {
 
 const bot = new Bot(token)
 
-// Standard main menu keyboard — used everywhere
+// Keyboards
 const mainMenuKeyboard = {
   reply_markup: {
     keyboard: [
+      [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+      [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
+    ],
+    resize_keyboard: true
+  }
+}
+
+const dailyLogsKeyboard = {
+  reply_markup: {
+    keyboard: [
       [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-      [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-      [{ text: '🥚 Log Eggs' }, { text: '🪹 Litter Check' }],
-      [{ text: '💊 Log Drug' }, { text: '📦 Check Stock' }],
-      [{ text: '❤️ Health Check' }, { text: '💰 Profit Summary' }],
-      [{ text: '🔒 Close Flock Cycle' }, { text: '🏠 Main Menu' }]
+      [{ text: '🥚 Log Eggs' }, { text: '⚖️ Log Weight' }],
+      [{ text: '🪹 Litter Check' }, { text: '💊 Log Drug' }],
+      [{ text: '🔙 Back' }]
+    ],
+    resize_keyboard: true
+  }
+}
+
+const salesFinanceKeyboard = {
+  reply_markup: {
+    keyboard: [
+      [{ text: '💵 Log Sales' }, { text: '💰 Log Expense' }],
+      [{ text: '📊 Profit Summary' }],
+      [{ text: '🔙 Back' }]
+    ],
+    resize_keyboard: true
+  }
+}
+
+const farmManagementKeyboard = {
+  reply_markup: {
+    keyboard: [
+      [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
+      [{ text: '🔒 Close Flock Cycle' }, { text: '➕ New Flock' }],
+      [{ text: '🔙 Back' }]
     ],
     resize_keyboard: true
   }
@@ -154,7 +188,7 @@ bot.on('message:text', async (ctx) => {
       }
     }
 
-    // Global exit — cancel any active flow
+    // Global exit
     if (
       input.toLowerCase() === 'cancel' ||
       input.toLowerCase() === 'menu' ||
@@ -164,7 +198,44 @@ bot.on('message:text', async (ctx) => {
       session.current_step = null
       session.collected_data = {}
       await saveSession(farmerId, session)
-      await ctx.reply(`No problem! What would you like to do?`, mainMenuKeyboard)
+      await ctx.reply(`What would you like to do?`, mainMenuKeyboard)
+      return
+    }
+
+    // Submenu navigation
+    if (input === '📋 Daily Logs') {
+      await ctx.reply('What would you like to log?', dailyLogsKeyboard)
+      return
+    }
+
+    if (input === '💵 Sales & Finance') {
+      await ctx.reply('Sales and finance options:', salesFinanceKeyboard)
+      return
+    }
+
+    if (input === '📦 Farm Management') {
+      await ctx.reply('Farm management options:', farmManagementKeyboard)
+      return
+    }
+
+    if (input === '🔙 Back') {
+      await ctx.reply('What would you like to do?', mainMenuKeyboard)
+      return
+    }
+
+    if (input === '➕ New Flock') {
+      await ctx.reply(
+        'What type of flock are you adding?',
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: '🐔 Broiler' }, { text: '🥚 Layer' }],
+              [{ text: '🔙 Back' }]
+            ],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -214,29 +285,22 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'EXPENSE_LOGGING') {
+      await handleExpenseStep(ctx, session)
+      return
+    }
+
     // Handle menu buttons
-    if (input === '🐔 Broiler' || input.toUpperCase() === 'BROILER') {
+    if (input === '🐔 Broiler' ||
+        input === '🐔 Start New Broiler Flock' ||
+        input.toUpperCase() === 'BROILER') {
       await startFlockCreation(ctx, session, 'BROILER')
       return
     }
 
-    if (input === '🥚 Layer' || input.toUpperCase() === 'LAYER') {
-      await startFlockCreation(ctx, session, 'LAYER')
-      return
-    }
-
-    if (
-      input === '🐔 Start New Broiler Flock' ||
-      input === '🐔 Broiler'
-    ) {
-      await startFlockCreation(ctx, session, 'BROILER')
-      return
-    }
-
-    if (
-      input === '🥚 Start New Layer Flock' ||
-      input === '🥚 Layer'
-    ) {
+    if (input === '🥚 Layer' ||
+        input === '🥚 Start New Layer Flock' ||
+        input.toUpperCase() === 'LAYER') {
       await startFlockCreation(ctx, session, 'LAYER')
       return
     }
@@ -294,6 +358,35 @@ bot.on('message:text', async (ctx) => {
 
     if (input === '💊 Log Drug') {
       await startDrugLogging(ctx, session)
+      return
+    }
+
+    if (input === '💰 Log Expense') {
+      await startExpenseLogging(ctx, session)
+      return
+    }
+
+    if (input === '📊 Profit Summary') {
+      await ctx.reply(
+        'Profit summary coming soon! We are still building this feature.',
+        mainMenuKeyboard
+      )
+      return
+    }
+
+    if (input === '📦 Check Stock') {
+      await ctx.reply(
+        'Stock check coming soon! We are still building this feature.',
+        mainMenuKeyboard
+      )
+      return
+    }
+
+    if (input === '❤️ Health Check') {
+      await ctx.reply(
+        'Health diagnosis coming soon! We are still building this feature.',
+        mainMenuKeyboard
+      )
       return
     }
 

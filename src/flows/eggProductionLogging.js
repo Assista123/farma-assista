@@ -13,10 +13,8 @@ async function startEggProductionLogging(ctx, session) {
       {
         reply_markup: {
           keyboard: [
-            [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-            [{ text: '💵 Log Sales' }, { text: '⚖️ Log Weight' }],
-            [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-            [{ text: '💰 Profit Summary' }, { text: '🏠 Main Menu' }]
+            [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+            [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
           ],
           resize_keyboard: true
         }
@@ -414,9 +412,11 @@ async function saveEggProduction(ctx, session) {
 
   // Broken egg warning
   let brokenWarning = ''
-  const brokenRate = data.broken_eggs / data.eggs_collected * 100
-  if (brokenRate > 5) {
-    brokenWarning = `\n\n⚠️ ${data.broken_eggs} broken eggs today (${brokenRate.toFixed(1)}%). High breakage may indicate calcium deficiency or housing issues.`
+  if (data.eggs_collected > 0) {
+    const brokenRate = (data.broken_eggs / data.eggs_collected) * 100
+    if (brokenRate > 5) {
+      brokenWarning = `\n\n⚠️ ${data.broken_eggs} broken eggs today (${brokenRate.toFixed(1)}%). High breakage may indicate calcium deficiency or housing issues.`
+    }
   }
 
   await ctx.reply(
@@ -432,10 +432,8 @@ async function saveEggProduction(ctx, session) {
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🌾 Log Feed' }, { text: '💀 Log Mortality' }],
-          [{ text: '💵 Log Sales' }, { text: '🥚 Log Eggs' }],
-          [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-          [{ text: '💰 Profit Summary' }, { text: '🏠 Main Menu' }]
+          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
       }
