@@ -57,6 +57,10 @@ const {
   startUpdateQuantity,
   handleUpdateQuantity
 } = require('../flows/stockManagement')
+const {
+  startProfitSummary,
+  handleReportsStep
+} = require('../flows/reports')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
@@ -70,7 +74,6 @@ if (!token) {
 
 const bot = new Bot(token)
 
-// Keyboards
 const mainMenuKeyboard = {
   reply_markup: {
     keyboard: [
@@ -207,7 +210,7 @@ bot.on('message:text', async (ctx) => {
       session.current_step = null
       session.collected_data = {}
       await saveSession(farmerId, session)
-      await ctx.reply(`What would you like to do?`, mainMenuKeyboard)
+      await ctx.reply('What would you like to do?', mainMenuKeyboard)
       return
     }
 
@@ -248,7 +251,7 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Route to active flow
+    // ── FLOW ROUTING ─────────────────────────────────────────────
     if (session.current_flow === 'FLOCK_CREATION') {
       await handleFlockCreationStep(ctx, session)
       return
@@ -299,7 +302,27 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Handle menu buttons
+    if (session.current_flow === 'ADD_STOCK_ITEM') {
+      await handleAddStockItem(ctx, session)
+      return
+    }
+
+    if (session.current_flow === 'LOG_STOCK_USAGE') {
+      await handleLogUsage(ctx, session)
+      return
+    }
+
+    if (session.current_flow === 'UPDATE_STOCK_QUANTITY') {
+      await handleUpdateQuantity(ctx, session)
+      return
+    }
+
+    if (session.current_flow === 'PROFIT_SUMMARY') {
+      await handleReportsStep(ctx, session)
+      return
+    }
+
+    // ── MENU BUTTON HANDLERS ──────────────────────────────────────
     if (input === '🐔 Broiler' ||
         input === '🐔 Start New Broiler Flock' ||
         input.toUpperCase() === 'BROILER') {
@@ -375,34 +398,8 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    if (session.current_flow === 'ADD_STOCK_ITEM') {
-      await handleAddStockItem(ctx, session)
-      return
-    }
-
-    if (session.current_flow === 'LOG_STOCK_USAGE') {
-      await handleLogUsage(ctx, session)
-      return
-    }
-
-    if (session.current_flow === 'UPDATE_STOCK_QUANTITY') {
-      await handleUpdateQuantity(ctx, session)
-      return
-    }
-
     if (input === '📊 Profit Summary') {
-      await ctx.reply(
-        'Profit summary coming soon! We are still building this feature.',
-        mainMenuKeyboard
-      )
-      return
-    }
-
-    if (input === '❤️ Health Check') {
-      await ctx.reply(
-        'Health diagnosis coming soon! We are still building this feature.',
-        mainMenuKeyboard
-      )
+      await startProfitSummary(ctx, session)
       return
     }
 
@@ -425,7 +422,15 @@ bot.on('message:text', async (ctx) => {
       await startUpdateQuantity(ctx, session)
       return
     }
-    
+
+    if (input === '❤️ Health Check') {
+      await ctx.reply(
+        'Health diagnosis coming soon! We are still building this feature.',
+        mainMenuKeyboard
+      )
+      return
+    }
+
     // Handle undo
     if (input === '↩️ Undo last entry') {
       const undoEntry = await getUndoEntry(farmerId)
