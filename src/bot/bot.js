@@ -65,6 +65,10 @@ const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
 const { deleteRecord } = require('../services/undoService')
+const {
+  showVaccinationSchedule,
+  handleVaccinationStep
+} = require('../flows/vaccinationFlow')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -111,7 +115,8 @@ const farmManagementKeyboard = {
   reply_markup: {
     keyboard: [
       [{ text: '📦 Check Stock' }, { text: '❤️ Health Check' }],
-      [{ text: '🔒 Close Flock Cycle' }, { text: '➕ New Flock' }],
+      [{ text: '💉 Vaccinations' }, { text: '🔒 Close Flock Cycle' }],
+      [{ text: '➕ New Flock' }],
       [{ text: '🔙 Back' }]
     ],
     resize_keyboard: true
@@ -322,6 +327,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'VACCINATION') {
+      await handleVaccinationStep(ctx, session)
+      return
+    }
+
     // ── MENU BUTTON HANDLERS ──────────────────────────────────────
     if (input === '🐔 Broiler' ||
         input === '🐔 Start New Broiler Flock' ||
@@ -428,6 +438,11 @@ bot.on('message:text', async (ctx) => {
         'Health diagnosis coming soon! We are still building this feature.',
         mainMenuKeyboard
       )
+      return
+    }
+
+    if (input === '💉 Vaccinations') {
+      await showVaccinationSchedule(ctx, session)
       return
     }
 

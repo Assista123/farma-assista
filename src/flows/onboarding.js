@@ -1,16 +1,7 @@
 const { createFarmer } = require('../services/farmerService')
 const { saveSession, clearSession } = require('../utils/sessionManager')
+const { mainMenuKeyboard } = require('../utils/keyboards')
 
-// All the steps in the onboarding flow in order
-const STEPS = [
-  'ASK_NAME',
-  'ASK_FARM_NAME',
-  'ASK_STATE',
-  'ASK_LGA',
-  'CONFIRM'
-]
-
-// The first message when a new farmer starts
 async function startOnboarding(ctx, session) {
   session.current_flow = 'ONBOARDING'
   session.current_step = 'ASK_NAME'
@@ -24,19 +15,31 @@ async function startOnboarding(ctx, session) {
     `track your birds, monitor health, manage stock, ` +
     `and see how much profit you are making.\n\n` +
     `Let us get you set up. This will only take 2 minutes.\n\n` +
-    `What is your name?`
+    `What is your name?`,
+    {
+      reply_markup: {
+        keyboard: [[{ text: '🏠 Main Menu' }]],
+        resize_keyboard: true
+      }
+    }
   )
 }
 
-// Handle each step as the farmer responds
 async function handleOnboardingStep(ctx, session) {
   const input = ctx.message.text.trim()
   const currentStep = session.current_step
 
-  // ASK_NAME — collect farmer's name
   if (currentStep === 'ASK_NAME') {
     if (input.length < 2) {
-      await ctx.reply('Please enter your full name.')
+      await ctx.reply(
+        'Please enter your full name.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -47,15 +50,28 @@ async function handleOnboardingStep(ctx, session) {
     await ctx.reply(
       `Nice to meet you, ${input}! 👋\n\n` +
       `What is the name of your farm?\n\n` +
-      `(If you do not have a name yet, you can just say "My Farm")`
+      `(If you do not have a name yet, you can just say "My Farm")`,
+      {
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
     )
     return
   }
 
-  // ASK_FARM_NAME — collect farm name
   if (currentStep === 'ASK_FARM_NAME') {
     if (input.length < 2) {
-      await ctx.reply('Please enter a name for your farm.')
+      await ctx.reply(
+        'Please enter a name for your farm.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -66,15 +82,28 @@ async function handleOnboardingStep(ctx, session) {
     await ctx.reply(
       `Great name! 🏡\n\n` +
       `Which state is ${input} located in?\n\n` +
-      `For example: Lagos, Abuja, Kano, Oyo, Rivers`
+      `For example: Lagos, Abuja, Kano, Oyo, Rivers`,
+      {
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
     )
     return
   }
 
-  // ASK_STATE — collect state
   if (currentStep === 'ASK_STATE') {
     if (input.length < 2) {
-      await ctx.reply('Please enter your state.')
+      await ctx.reply(
+        'Please enter your state.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -84,15 +113,28 @@ async function handleOnboardingStep(ctx, session) {
 
     await ctx.reply(
       `Got it — ${input}.\n\n` +
-      `What Local Government Area (LGA) is your farm in?`
+      `What Local Government Area (LGA) is your farm in?`,
+      {
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
     )
     return
   }
 
-  // ASK_LGA — collect LGA
   if (currentStep === 'ASK_LGA') {
     if (input.length < 2) {
-      await ctx.reply('Please enter your LGA.')
+      await ctx.reply(
+        'Please enter your LGA.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -107,25 +149,42 @@ async function handleOnboardingStep(ctx, session) {
       `👤 Name: ${data.name}\n` +
       `🏡 Farm: ${data.farm_name}\n` +
       `📍 Location: ${data.lga}, ${data.state}\n\n` +
-      `Is this correct? Reply YES to continue or NO to start over.`
+      `Is this correct?`,
+      {
+        reply_markup: {
+          keyboard: [
+            [{ text: '✅ Yes, looks good' }, { text: '❌ No, start over' }],
+            [{ text: '🏠 Main Menu' }]
+          ],
+          resize_keyboard: true
+        }
+      }
     )
     return
   }
 
-  // CONFIRM — save to database or restart
   if (currentStep === 'CONFIRM') {
-    if (input.toUpperCase() === 'NO') {
-      // Start over
+    if (input === '❌ No, start over') {
       await startOnboarding(ctx, session)
       return
     }
 
-    if (input.toUpperCase() !== 'YES') {
-      await ctx.reply('Please reply YES to confirm or NO to start over.')
+    if (input !== '✅ Yes, looks good') {
+      await ctx.reply(
+        'Please use the buttons to confirm or start over.',
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: '✅ Yes, looks good' }, { text: '❌ No, start over' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
-    // Save farmer to database
     const data = session.collected_data
     const farmer = await createFarmer({
       phone_number: session.farmer_id,
@@ -137,12 +196,17 @@ async function handleOnboardingStep(ctx, session) {
 
     if (!farmer) {
       await ctx.reply(
-        'Sorry, something went wrong saving your details. Please try again.'
+        'Sorry, something went wrong saving your details. Please try again.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
       )
       return
     }
 
-    // Update session with farmer info
     session.is_registered = true
     session.farmer_name = farmer.name
     session.farm_name = farmer.farm_name
@@ -162,10 +226,10 @@ async function handleOnboardingStep(ctx, session) {
         reply_markup: {
           keyboard: [
             [{ text: '🐔 Broiler' }, { text: '🥚 Layer' }],
-            [{ text: 'I have both' }]
+            [{ text: 'I have both' }],
+            [{ text: '🏠 Main Menu' }]
           ],
-          resize_keyboard: true,
-          one_time_keyboard: true
+          resize_keyboard: true
         }
       }
     )
