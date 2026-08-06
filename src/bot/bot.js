@@ -48,6 +48,15 @@ const {
   startExpenseLogging,
   handleExpenseStep
 } = require('../flows/expenseLogging')
+const {
+  showStockSummary,
+  startAddStockItem,
+  handleAddStockItem,
+  startLogUsage,
+  handleLogUsage,
+  startUpdateQuantity,
+  handleUpdateQuantity
+} = require('../flows/stockManagement')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
@@ -366,17 +375,24 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    if (input === '📊 Profit Summary') {
-      await ctx.reply(
-        'Profit summary coming soon! We are still building this feature.',
-        mainMenuKeyboard
-      )
+    if (session.current_flow === 'ADD_STOCK_ITEM') {
+      await handleAddStockItem(ctx, session)
       return
     }
 
-    if (input === '📦 Check Stock') {
+    if (session.current_flow === 'LOG_STOCK_USAGE') {
+      await handleLogUsage(ctx, session)
+      return
+    }
+
+    if (session.current_flow === 'UPDATE_STOCK_QUANTITY') {
+      await handleUpdateQuantity(ctx, session)
+      return
+    }
+
+    if (input === '📊 Profit Summary') {
       await ctx.reply(
-        'Stock check coming soon! We are still building this feature.',
+        'Profit summary coming soon! We are still building this feature.',
         mainMenuKeyboard
       )
       return
@@ -390,6 +406,26 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (input === '📦 Check Stock') {
+      await showStockSummary(ctx, session)
+      return
+    }
+
+    if (input === '➕ Add Stock Item') {
+      await startAddStockItem(ctx, session)
+      return
+    }
+
+    if (input === '📝 Log Usage') {
+      await startLogUsage(ctx, session)
+      return
+    }
+
+    if (input === '🔄 Update Quantity') {
+      await startUpdateQuantity(ctx, session)
+      return
+    }
+    
     // Handle undo
     if (input === '↩️ Undo last entry') {
       const undoEntry = await getUndoEntry(farmerId)
