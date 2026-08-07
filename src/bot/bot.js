@@ -73,6 +73,10 @@ const {
   handleRecountResponse,
   isRecountPending
 } = require('../utils/recountHelper')
+const {
+  startHealthDiagnosis,
+  handleHealthDiagnosisStep
+} = require('../flows/healthDiagnosis')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -344,6 +348,11 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (session.current_flow === 'HEALTH_DIAGNOSIS') {
+      await handleHealthDiagnosisStep(ctx, session)
+      return
+    }
+    
     // ── MENU BUTTON HANDLERS ──────────────────────────────────────
     if (input === '🐔 Broiler' ||
         input === '🐔 Start New Broiler Flock' ||
@@ -450,11 +459,8 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    if (input === '❤️ Health Check') {
-      await ctx.reply(
-        'Health diagnosis coming soon! We are still building this feature.',
-        mainMenuKeyboard
-      )
+    if (input === '❤️ Health Check' || input === '❤️ Run Health Check') {
+      await startHealthDiagnosis(ctx, session)
       return
     }
 
