@@ -7,13 +7,11 @@ const {
 const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveSession } = require('../utils/sessionManager')
 const { mainMenuKeyboard } = require('../utils/keyboards')
+const { askRecountPrompt } = require('../utils/recountHelper')
 
 async function startProfitSummary(ctx, session) {
   if (session.active_flocks.length === 0) {
-    await ctx.reply(
-      'You have no active flocks to report on.',
-      mainMenuKeyboard
-    )
+    await ctx.reply('You have no active flocks to report on.', mainMenuKeyboard)
     return
   }
 
@@ -86,6 +84,7 @@ async function showProfitReport(ctx, session, flockId) {
     }
   }
 
+  // Clear flow
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -124,8 +123,16 @@ async function showProfitReport(ctx, session, flockId) {
     `   Drugs: ₦${profitability.expenses.drugs.toLocaleString()}\n` +
     `   Other: ₦${(profitability.expenses.direct + profitability.expenses.consumables + profitability.expenses.allocated_farm).toLocaleString()}\n` +
     `   Total: ₦${profitability.expenses.total.toLocaleString()}\n\n` +
-    `${profitLabel}: ₦${Math.abs(profitability.profit_loss).toLocaleString()}`,
-    mainMenuKeyboard
+    `${profitLabel}: ₦${Math.abs(profitability.profit_loss).toLocaleString()}`
+  )
+
+  // Ask recount prompt after report
+  await askRecountPrompt(
+    ctx,
+    session,
+    flockId,
+    flock.flock_name,
+    flock.current_bird_count
   )
 }
 
@@ -147,9 +154,7 @@ async function showAllFlocksSummary(ctx, session) {
     }
     totalDeaths += mortality ? mortality.total_deaths : 0
 
-    const profit = profitability
-      ? profitability.profit_loss
-      : 0
+    const profit = profitability ? profitability.profit_loss : 0
     const profitLabel = profit >= 0 ? '✅' : '❌'
 
     message +=

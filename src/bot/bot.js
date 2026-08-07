@@ -61,14 +61,18 @@ const {
   startProfitSummary,
   handleReportsStep
 } = require('../flows/reports')
+const {
+  showVaccinationSchedule,
+  handleVaccinationStep
+} = require('../flows/vaccinationFlow')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
 const { deleteRecord } = require('../services/undoService')
 const {
-  showVaccinationSchedule,
-  handleVaccinationStep
-} = require('../flows/vaccinationFlow')
+  handleRecountResponse,
+  isRecountPending
+} = require('../utils/recountHelper')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -214,9 +218,17 @@ bot.on('message:text', async (ctx) => {
       session.current_flow = null
       session.current_step = null
       session.collected_data = {}
+      session.recount_pending = null
+      session.recount_step = null
       await saveSession(farmerId, session)
       await ctx.reply('What would you like to do?', mainMenuKeyboard)
       return
+    }
+
+    // Handle recount if pending
+    if (isRecountPending(session)) {
+      const handled = await handleRecountResponse(ctx, session, input)
+      if (handled) return
     }
 
     // Submenu navigation
@@ -433,16 +445,16 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
+    if (input === '💉 Vaccinations') {
+      await showVaccinationSchedule(ctx, session)
+      return
+    }
+
     if (input === '❤️ Health Check') {
       await ctx.reply(
         'Health diagnosis coming soon! We are still building this feature.',
         mainMenuKeyboard
       )
-      return
-    }
-
-    if (input === '💉 Vaccinations') {
-      await showVaccinationSchedule(ctx, session)
       return
     }
 

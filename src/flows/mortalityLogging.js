@@ -2,8 +2,9 @@ const { logMortality, getTotalExpensesToDate } = require('../services/mortalityS
 const { getFlockById, getBirdAgeDays, getAgeCategory, updateBirdCount } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
+const { askRecountPrompt } = require('../utils/recountHelper')
+const { mainMenuKeyboard } = require('../utils/keyboards')
 
-// Predefined cause options
 const CAUSES = [
   { label: 'Newcastle Disease', value: 'NEWCASTLE' },
   { label: 'Coccidiosis', value: 'COCCIDIOSIS' },
@@ -17,7 +18,6 @@ const CAUSES = [
   { label: 'Other (specify)', value: 'OTHER' }
 ]
 
-// Start mortality logging flow
 async function startMortalityLogging(ctx, session) {
   session.current_flow = 'MORTALITY_LOGGING'
   session.current_step = 'ASK_FLOCK'
@@ -59,16 +59,12 @@ async function startMortalityLogging(ctx, session) {
   )
 }
 
-// Handle each step
 async function handleMortalityStep(ctx, session) {
   const input = ctx.message.text.trim()
   const currentStep = session.current_step
 
-  // ASK_FLOCK
   if (currentStep === 'ASK_FLOCK') {
-    const flock = session.active_flocks.find(
-      f => f.flock_name === input
-    )
+    const flock = session.active_flocks.find(f => f.flock_name === input)
 
     if (!flock) {
       await ctx.reply('Please select a flock from the options.')
@@ -82,24 +78,27 @@ async function handleMortalityStep(ctx, session) {
 
     await ctx.reply(
       `Sorry to hear about the loss. 😔\n\n` +
-      `How many birds did you lose from ${flock.flock_name}?`
+      `How many birds did you lose from ${flock.flock_name}?`,
+      {
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
     )
     return
   }
 
-  // ASK_COUNT
   if (currentStep === 'ASK_COUNT') {
     const count = parseInt(input)
 
     if (isNaN(count) || count < 1) {
       await ctx.reply(
-        'Please enter a valid number.\n' +
-        'For example: 5'
+        'Please enter a valid number.\nFor example: 5'
       )
       return
     }
 
-    // Get flock details to validate count
     const flock = await getFlockById(session.collected_data.flock_id)
 
     if (count > flock.current_bird_count) {
@@ -116,13 +115,13 @@ async function handleMortalityStep(ctx, session) {
     session.current_step = 'ASK_CAUSE'
     await saveSession(session.farmer_id, session)
 
-    // Build cause keyboard — 2 per row
     const causeButtons = []
     for (let i = 0; i < CAUSES.length; i += 2) {
       const row = [{ text: CAUSES[i].label }]
       if (CAUSES[i + 1]) row.push({ text: CAUSES[i + 1].label })
       causeButtons.push(row)
     }
+    causeButtons.push([{ text: '🏠 Main Menu' }])
 
     await ctx.reply(
       `What do you think caused the death${count > 1 ? 's' : ''}?\n\n` +
@@ -130,15 +129,13 @@ async function handleMortalityStep(ctx, session) {
       {
         reply_markup: {
           keyboard: causeButtons,
-          resize_keyboard: true,
-          one_time_keyboard: true
+          resize_keyboard: true
         }
       }
     )
     return
   }
 
-  // ASK_CAUSE
   if (currentStep === 'ASK_CAUSE') {
     const cause = CAUSES.find(c => c.label === input)
 
@@ -154,7 +151,13 @@ async function handleMortalityStep(ctx, session) {
       await saveSession(session.farmer_id, session)
 
       await ctx.reply(
-        'Please describe what you think caused the death(s):'
+        'Please describe what you think caused the death(s):',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
       )
       return
     }
@@ -165,7 +168,6 @@ async function handleMortalityStep(ctx, session) {
     return
   }
 
-  // ASK_CUSTOM_CAUSE
   if (currentStep === 'ASK_CUSTOM_CAUSE') {
     if (input.length < 3) {
       await ctx.reply('Please describe the cause in a few words.')
@@ -179,7 +181,6 @@ async function handleMortalityStep(ctx, session) {
     return
   }
 
-  // CONFIRM
   if (currentStep === 'CONFIRM') {
     if (input === '❌ No, start over') {
       await startMortalityLogging(ctx, session)
@@ -225,24 +226,20 @@ async function showConfirmation(ctx, session) {
   )
 }
 
-// Save mortality to database
 async function saveMortality(ctx, session) {
   const data = session.collected_data
   const today = new Date().toISOString().split('T')[0]
 
-  // Get flock details for age calculation
   const flock = await getFlockById(data.flock_id)
   const birdAgeDays = getBirdAgeDays(flock.start_date)
   const ageCategory = getAgeCategory(flock.type, birdAgeDays)
 
-  // Calculate cost per bird at death
   const totalExpenses = await getTotalExpensesToDate(data.flock_id, today)
   const costPerBird = data.bird_count_before_event > 0
     ? totalExpenses / data.bird_count_before_event
     : 0
   const actualLoss = costPerBird * data.count
 
-  // Save mortality log
   const mortality = await logMortality({
     flock_id: data.flock_id,
     date: today,
@@ -261,19 +258,14 @@ async function saveMortality(ctx, session) {
     return
   }
 
-  // Update flock bird count
   const newCount = data.bird_count_before_event - data.count
   await updateBirdCount(data.flock_id, newCount)
 
-  // Update session active flocks
-  const flockIndex = session.active_flocks.findIndex(
-    f => f.id === data.flock_id
-  )
+  const flockIndex = session.active_flocks.findIndex(f => f.id === data.flock_id)
   if (flockIndex !== -1) {
     session.active_flocks[flockIndex].current_bird_count = newCount
   }
 
-  // Save undo entry
   await saveUndoEntry(session.farmer_id, {
     type: 'MORTALITY',
     record_id: mortality.id,
@@ -283,20 +275,21 @@ async function saveMortality(ctx, session) {
     description: `${data.count} bird death(s) logged for ${data.flock_name}`
   })
 
-  // Clear flow
-  session.current_flow = null
-  session.current_step = null
-  session.collected_data = {}
-  await saveSession(session.farmer_id, session)
-
-  // Check for high mortality alert
   const mortalityRate = (data.count / data.bird_count_before_event) * 100
   const highMortality = mortalityRate >= 5
 
   let alertMessage = ''
   if (highMortality) {
-    alertMessage = `\n\n⚠️ This is a high mortality event (${mortalityRate.toFixed(1)}% of your flock). Would you like to run a health check?`
+    alertMessage =
+      `\n\n⚠️ This is a high mortality event (${mortalityRate.toFixed(1)}% of your flock). ` +
+      `Would you like to run a health check?`
   }
+
+  // Clear flow before recount prompt
+  session.current_flow = null
+  session.current_step = null
+  session.collected_data = {}
+  await saveSession(session.farmer_id, session)
 
   await ctx.reply(
     `✅ Mortality recorded.\n\n` +
@@ -306,16 +299,21 @@ async function saveMortality(ctx, session) {
     `📅 Age: ${birdAgeDays} days (${ageCategory})\n` +
     `💰 Estimated loss: ₦${actualLoss.toFixed(0)}` +
     alertMessage,
-    {
-      reply_markup: {
-        keyboard: [
-          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
-          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
-        ],
-        resize_keyboard: true
-      }
-    }
+    highMortality
+      ? {
+          reply_markup: {
+            keyboard: [
+              [{ text: '❤️ Run Health Check' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
+            resize_keyboard: true
+          }
+        }
+      : mainMenuKeyboard
   )
+
+  // Ask recount prompt after mortality
+  await askRecountPrompt(ctx, session, data.flock_id, data.flock_name, newCount)
 }
 
 module.exports = {
