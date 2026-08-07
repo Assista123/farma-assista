@@ -3,6 +3,7 @@ require('dotenv').config()
 const express = require('express')
 const app = express()
 const bot = require('./src/bot/bot')
+const { startScheduler } = require('./src/scheduler')
 
 // Middleware
 app.use(express.json())
@@ -26,5 +27,8 @@ app.listen(PORT, () => {
 // Start Telegram bot
 bot.start()
 console.log('Farma Assista bot is running')
+
+// Start scheduler
+startScheduler(bot)
 
 module.exports = app

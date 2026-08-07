@@ -8,6 +8,10 @@ const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveSession } = require('../utils/sessionManager')
 const { mainMenuKeyboard } = require('../utils/keyboards')
 const { askRecountPrompt } = require('../utils/recountHelper')
+const {
+  checkBirdCountReconciliation,
+  buildDiscrepancyMessage
+} = require('../utils/reconciliationHelper')
 
 async function startProfitSummary(ctx, session) {
   if (session.active_flocks.length === 0) {
@@ -125,6 +129,15 @@ async function showProfitReport(ctx, session, flockId) {
     `   Total: ₦${profitability.expenses.total.toLocaleString()}\n\n` +
     `${profitLabel}: ₦${Math.abs(profitability.profit_loss).toLocaleString()}`
   )
+
+  // Check bird count reconciliation
+  const reconciliation = await checkBirdCountReconciliation(flockId)
+  if (reconciliation && reconciliation.has_discrepancy) {
+    const discrepancyMsg = buildDiscrepancyMessage(reconciliation)
+    if (discrepancyMsg) {
+      await ctx.reply(discrepancyMsg)
+    }
+  }
 
   // Ask recount prompt after report
   await askRecountPrompt(

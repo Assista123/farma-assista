@@ -1,5 +1,5 @@
 const { saveSession } = require('../utils/sessionManager')
-const { mainMenuKeyboard } = require('../utils/keyboards')
+const { saveDiagnosisLog, getAllConditions } = require('../services/healthService')
 const { getFlockById, getBirdAgeDays, getAgeCategory } = require('../services/flockService')
 const supabase = require('../config/database')
 
@@ -267,11 +267,9 @@ async function runDiagnosis(ctx, session) {
     const ageCategory = getAgeCategory(flock.type, birdAgeDays)
 
     // Get all conditions from database
-    const { data: conditions, error } = await supabase
-      .from('conditions')
-      .select('*')
+    const conditions = await getAllConditions()
 
-    if (error || !conditions || conditions.length === 0) {
+    if (!conditions || conditions.length === 0) {
       await ctx.reply(
         'Sorry, we could not run the diagnosis right now. Please try again.',
         mainMenuKeyboard
@@ -338,7 +336,7 @@ async function runDiagnosis(ctx, session) {
       topMatch.percentage >= 50
 
     // Save diagnosis to database
-    await supabase.from('health_diagnosis_logs').insert([{
+    await saveDiagnosisLog({
       flock_id: data.flock_id,
       date: new Date().toISOString().split('T')[0],
       bird_age_days: birdAgeDays,
@@ -349,9 +347,8 @@ async function runDiagnosis(ctx, session) {
       recommended_drugs: topMatch.condition.recommended_drugs,
       severity: topMatch.condition.severity,
       vet_escalated: topMatch.condition.always_escalate || twoConditionsClose || confidence === 'UNCERTAIN',
-      followup_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      outcome: 'PENDING'
-    }])
+      followup_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    })
 
     // Build diagnosis message
     let diagnosisText = ''
