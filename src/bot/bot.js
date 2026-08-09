@@ -77,6 +77,8 @@ const {
   startHealthDiagnosis,
   handleHealthDiagnosisStep
 } = require('../flows/healthDiagnosis')
+const { detectIntent } = require('../utils/intentDetector')
+const { generateResponse } = require('../utils/responseGenerator')
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 
@@ -499,11 +501,106 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Default — show main menu
-    await ctx.reply(
-      `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
-      mainMenuKeyboard
-    )
+    // Default — use Gemini intent detection for free text
+    const intent = await detectIntent(input, session.farmer_name)
+    console.log(`Intent detected: ${intent} for message: "${input}"`)
+
+    switch (intent) {
+      case 'LOG_FEED_PURCHASE':
+      case 'LOG_FEED_CONSUMPTION':
+        await startFeedLogging(ctx, session)
+        break
+
+      case 'LOG_MORTALITY':
+        await startMortalityLogging(ctx, session)
+        break
+
+      case 'LOG_BIRD_SALES':
+      case 'LOG_EGG_SALES':
+        await startSalesLogging(ctx, session)
+        break
+
+      case 'LOG_WEIGHT':
+        await startWeightLogging(ctx, session)
+        break
+
+      case 'LOG_EGG_PRODUCTION':
+        await startEggProductionLogging(ctx, session)
+        break
+
+      case 'LOG_EXPENSE':
+        await startExpenseLogging(ctx, session)
+        break
+
+      case 'LOG_DRUG':
+        await startDrugLogging(ctx, session)
+        break
+
+      case 'LOG_LITTER':
+        await startLitterLogging(ctx, session)
+        break
+
+      case 'CHECK_STOCK':
+      case 'ADD_STOCK':
+        await showStockSummary(ctx, session)
+        break
+
+      case 'CHECK_PROFIT':
+        await startProfitSummary(ctx, session)
+        break
+
+      case 'HEALTH_DIAGNOSIS':
+        await startHealthDiagnosis(ctx, session)
+        break
+
+      case 'CHECK_VACCINATION':
+        await showVaccinationSchedule(ctx, session)
+        break
+
+      case 'CLOSE_FLOCK':
+        await startCloseFlock(ctx, session)
+        break
+
+      case 'NEW_FLOCK':
+        await ctx.reply(
+          'What type of flock are you adding?',
+          {
+            reply_markup: {
+              keyboard: [
+                [{ text: '🐔 Broiler' }, { text: '🥚 Layer' }],
+                [{ text: '🔙 Back' }]
+              ],
+              resize_keyboard: true
+            }
+          }
+        )
+        break
+
+      case 'GENERAL_QUESTION':
+        const answer = await generateResponse(
+          `The farmer asked: "${input}". Answer their poultry farming question briefly and helpfully.`,
+          {
+            farmer_name: session.farmer_name,
+            farm_name: session.farm_name,
+            active_flocks: session.active_flocks
+          }
+        )
+        if (answer) {
+          await ctx.reply(answer, mainMenuKeyboard)
+        } else {
+          await ctx.reply(
+            `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
+            mainMenuKeyboard
+          )
+        }
+        break
+
+      default:
+        await ctx.reply(
+          `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
+          mainMenuKeyboard
+        )
+    }
 
   } catch (err) {
     console.error('Bot error:', err.message)
