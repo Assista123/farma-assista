@@ -5,7 +5,7 @@ const {
   getDailyUsageRate
 } = require('../services/feedService')
 const { saveSession } = require('../utils/sessionManager')
-const { mapToOption } = require('../utils/optionMapper')
+const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 
 async function startFeedLogging(ctx, session) {
   session.current_flow = 'FEED_LOGGING'
@@ -148,7 +148,15 @@ async function handleFeedLoggingStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_QUANTITY_KG') {
-    const quantity = parseFloat(input)
+    let quantity = parseFloat(input)
+
+    if (isNaN(quantity)) {
+      const mapped = await mapToNumber(
+        input,
+        'Farmer is entering feed quantity in kg'
+      )
+      if (mapped !== null) quantity = mapped
+    }
 
     if (isNaN(quantity) || quantity <= 0) {
       await ctx.reply('Please enter a valid quantity in kg.\nFor example: 50')
@@ -174,7 +182,15 @@ async function handleFeedLoggingStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_COST') {
-    const cost = parseFloat(input)
+    let cost = parseFloat(input)
+
+    if (isNaN(cost)) {
+      const mapped = await mapToNumber(
+        input,
+        'Farmer is entering total feed cost in Naira'
+      )
+      if (mapped !== null) cost = mapped
+    }
 
     if (isNaN(cost) || cost <= 0) {
       await ctx.reply('Please enter a valid amount in Naira.\nFor example: 25000')

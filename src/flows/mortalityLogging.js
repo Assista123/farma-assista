@@ -4,7 +4,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { askRecountPrompt } = require('../utils/recountHelper')
 const { mainMenuKeyboard } = require('../utils/keyboards')
-const { mapToOption } = require('../utils/optionMapper')
+const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 
 const CAUSES = [
   { label: 'Newcastle Disease', value: 'NEWCASTLE' },
@@ -91,7 +91,15 @@ async function handleMortalityStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_COUNT') {
-    const count = parseInt(input)
+    let count = parseInt(input)
+
+    if (isNaN(count)) {
+      const mapped = await mapToNumber(
+        input,
+        'Farmer is entering number of birds that died'
+      )
+      if (mapped !== null) count = Math.floor(mapped)
+    }
 
     if (isNaN(count) || count < 1) {
       await ctx.reply(

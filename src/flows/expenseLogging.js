@@ -1,6 +1,7 @@
 const { logExpense } = require('../services/expenseService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
+const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 
 const CATEGORIES = [
   { label: '💉 Drugs & medication', value: 'DRUGS' },
@@ -34,7 +35,16 @@ async function handleExpenseStep(ctx, session) {
   const currentStep = session.current_step
 
   if (currentStep === 'ASK_CATEGORY') {
-    const category = CATEGORIES.find(c => c.label === input)
+    let category = CATEGORIES.find(c => c.label === input)
+
+    if (!category) {
+      const mapped = await mapToOption(
+        input,
+        CATEGORIES.map(c => c.label),
+        'Farmer is selecting expense category'
+      )
+      if (mapped) category = CATEGORIES.find(c => c.label === mapped)
+    }
 
     if (!category) {
       await ctx.reply('Please select a category from the options.')
@@ -112,7 +122,15 @@ async function handleExpenseStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_AMOUNT') {
-    const amount = parseFloat(input)
+    let amount = parseFloat(input)
+
+    if (isNaN(amount)) {
+      const mapped = await mapToNumber(
+        input,
+        'Farmer is entering expense amount in Naira'
+      )
+      if (mapped !== null) amount = mapped
+    }
 
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply(

@@ -2,6 +2,7 @@ const { logBirdSale, logEggSale } = require('../services/salesService')
 const { getFlockById, updateBirdCount } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
+const { mapToOption } = require('../utils/optionMapper')
 
 // Start sales logging
 async function startSalesLogging(ctx, session) {
@@ -55,7 +56,19 @@ async function handleSalesStep(ctx, session) {
 
   // ASK_SALE_TYPE
   if (currentStep === 'ASK_SALE_TYPE') {
-    if (input === '🐔 Selling birds') {
+
+    // Map free text to sale type
+    let saleInput = input
+    if (input !== '🐔 Selling birds' && input !== '🥚 Selling eggs') {
+      const mapped = await mapToOption(
+        input,
+        ['🐔 Selling birds', '🥚 Selling eggs'],
+        'Farmer is selecting what they are selling'
+      )
+      if (mapped) saleInput = mapped
+    }
+
+    if (saleInput === '🐔 Selling birds') {
       session.collected_data.sale_type = 'BIRDS'
       session.current_step = 'ASK_FLOCK'
       await saveSession(session.farmer_id, session)
@@ -63,7 +76,7 @@ async function handleSalesStep(ctx, session) {
       return
     }
 
-    if (input === '🥚 Selling eggs') {
+    if (saleinput === '🥚 Selling eggs') {
       session.collected_data.sale_type = 'EGGS'
       session.current_step = 'ASK_FLOCK'
       await saveSession(session.farmer_id, session)

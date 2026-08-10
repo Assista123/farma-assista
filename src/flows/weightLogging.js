@@ -3,6 +3,7 @@ const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { getFeedSummary } = require('../services/feedService')
+const { mapToNumber } = require('../utils/optionMapper')
 
 async function startWeightLogging(ctx, session) {
   const broilerFlocks = session.active_flocks.filter(f => f.type === 'BROILER')
@@ -104,7 +105,15 @@ async function handleWeightStep(ctx, session) {
   const weightIndex = weightSteps.indexOf(currentStep)
 
   if (weightIndex !== -1) {
-    const weight = parseFloat(input)
+    let weight = parseFloat(input)
+
+    if (isNaN(weight)) {
+      const mapped = await mapToNumber(
+        input,
+        'Farmer is entering bird weight in kg'
+      )
+      if (mapped !== null) weight = mapped
+    }
 
     if (isNaN(weight) || weight <= 0 || weight > 8) {
       await ctx.reply(

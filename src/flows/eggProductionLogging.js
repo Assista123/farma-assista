@@ -2,7 +2,7 @@ const { logEggProduction, getLayRate } = require('../services/eggProductionServi
 const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
-const { mapToOption } = require('../utils/optionMapper')
+const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 
 async function startEggProductionLogging(ctx, session) {
   const layerFlocks = session.active_flocks.filter(f => f.type === 'LAYER')
@@ -95,7 +95,15 @@ async function handleEggProductionStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_EGGS_COLLECTED') {
-    const count = parseInt(input)
+    let count = parseInt(input)
+
+    if (isNaN(count)) {
+      const mapped = await mapToNumber(
+        input,
+        'Farmer is entering number of eggs collected today'
+      )
+      if (mapped !== null) count = Math.floor(mapped)
+    }
 
     if (isNaN(count) || count < 0) {
       await ctx.reply(

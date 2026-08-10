@@ -23,6 +23,8 @@ const UNITS = [
   { label: 'UNITS', value: 'UNITS' }
 ]
 
+const { mapToOption, mapToNumber } = require('../utils/optionMapper')
+
 // Show stock summary
 async function showStockSummary(ctx, session) {
   const items = await getStockItems(session.farmer_db_id)
@@ -180,7 +182,12 @@ async function handleAddStockItem(ctx, session) {
   }
 
   if (currentStep === 'ASK_CURRENT_QUANTITY') {
-    const quantity = parseFloat(input)
+    let quantity = parseFloat(input)
+
+    if (isNaN(quantity)) {
+      const mapped = await mapToNumber(input, 'Farmer is entering stock quantity')
+      if (mapped !== null) quantity = mapped
+    }
 
     if (isNaN(quantity) || quantity < 0) {
       await ctx.reply('Please enter a valid quantity.')
