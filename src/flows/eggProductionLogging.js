@@ -2,6 +2,7 @@ const { logEggProduction, getLayRate } = require('../services/eggProductionServi
 const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
+const { mapToOption } = require('../utils/optionMapper')
 
 async function startEggProductionLogging(ctx, session) {
   const layerFlocks = session.active_flocks.filter(f => f.type === 'LAYER')
@@ -178,7 +179,16 @@ async function handleEggProductionStep(ctx, session) {
       '🔴 Much smaller than usual': 'MUCH_SMALLER'
     }
 
-    const sizeValue = sizeMap[input]
+    let sizeValue = sizeMap[input]
+
+    if (!sizeValue) {
+      const mapped = await mapToOption(
+        input,
+        Object.keys(sizeMap),
+        'Farmer is describing egg size compared to normal'
+      )
+      if (mapped) sizeValue = sizeMap[mapped]
+    }
 
     if (!sizeValue) {
       await ctx.reply('Please select an option from the buttons.')

@@ -5,6 +5,7 @@ const {
   getDailyUsageRate
 } = require('../services/feedService')
 const { saveSession } = require('../utils/sessionManager')
+const { mapToOption } = require('../utils/optionMapper')
 
 async function startFeedLogging(ctx, session) {
   session.current_flow = 'FEED_LOGGING'
@@ -110,7 +111,16 @@ async function handleFeedLoggingStep(ctx, session) {
       'Layer (18 weeks+)': 'LAYER'
     }
 
-    const feedType = feedTypeMap[input]
+    let feedType = feedTypeMap[input]
+
+    if (!feedType) {
+      const mapped = await mapToOption(
+        input,
+        Object.keys(feedTypeMap),
+        'Farmer is selecting feed type for their flock'
+      )
+      if (mapped) feedType = feedTypeMap[mapped]
+    }
 
     if (!feedType) {
       await ctx.reply('Please select a feed type from the options.')

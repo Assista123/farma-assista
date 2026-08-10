@@ -4,6 +4,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { askRecountPrompt } = require('../utils/recountHelper')
 const { mainMenuKeyboard } = require('../utils/keyboards')
+const { mapToOption } = require('../utils/optionMapper')
 
 const CAUSES = [
   { label: 'Newcastle Disease', value: 'NEWCASTLE' },
@@ -137,7 +138,19 @@ async function handleMortalityStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_CAUSE') {
-    const cause = CAUSES.find(c => c.label === input)
+    let cause = CAUSES.find(c => c.label === input)
+
+    if (!cause) {
+      // Try Gemini mapping for free text
+      const mapped = await mapToOption(
+        input,
+        CAUSES.map(c => c.label),
+        'Farmer is selecting the cause of bird deaths'
+      )
+      if (mapped) {
+        cause = CAUSES.find(c => c.label === mapped)
+      }
+    }
 
     if (!cause) {
       await ctx.reply('Please select a cause from the options.')

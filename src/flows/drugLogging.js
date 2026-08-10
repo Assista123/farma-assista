@@ -2,6 +2,7 @@ const { logDrug } = require('../services/drugService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mainMenuKeyboard, buildGridKeyboard } = require('../utils/keyboards')
+const { mapToOption } = require('../utils/optionMapper')
 
 // Common drugs used in Nigerian poultry farming
 const COMMON_DRUGS = [
@@ -123,7 +124,16 @@ async function handleDrugStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_CONDITION') {
-    session.collected_data.condition_treated = input === 'Other' ? null : input
+    let condition = input
+    if (input !== 'Other' && !COMMON_CONDITIONS.includes(input)) {
+      const mapped = await mapToOption(
+        input,
+        COMMON_CONDITIONS,
+        'Farmer is selecting the condition being treated'
+      )
+      condition = mapped || input
+    }
+    session.collected_data.condition_treated = condition === 'Other' ? null : condition
     session.current_step = 'ASK_DOSAGE'
     await saveSession(session.farmer_id, session)
 

@@ -2,6 +2,7 @@ const { saveSession } = require('../utils/sessionManager')
 const { saveDiagnosisLog, getAllConditions } = require('../services/healthService')
 const { getFlockById, getBirdAgeDays, getAgeCategory } = require('../services/flockService')
 const supabase = require('../config/database')
+const { mapToOption } = require('../utils/optionMapper')
 
 // All symptoms with plain language labels
 const SYMPTOMS = [
@@ -140,7 +141,16 @@ async function handleHealthDiagnosisStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_DROPPING_COLOR') {
-    const color = DROPPING_COLORS.find(c => c.label === input)
+    let color = DROPPING_COLORS.find(c => c.label === input)
+
+    if (!color) {
+      const mapped = await mapToOption(
+        input,
+        DROPPING_COLORS.map(c => c.label),
+        'Farmer is describing the color of bird droppings'
+      )
+      if (mapped) color = DROPPING_COLORS.find(c => c.label === mapped)
+    }
 
     if (!color) {
       await ctx.reply('Please select a dropping color from the options.')
@@ -155,7 +165,16 @@ async function handleHealthDiagnosisStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_DROPPING_TEXTURE') {
-    const texture = DROPPING_TEXTURES.find(t => t.label === input)
+    let texture = DROPPING_TEXTURES.find(t => t.label === input)
+
+    if (!texture) {
+      const mapped = await mapToOption(
+        input,
+        DROPPING_TEXTURES.map(t => t.label),
+        'Farmer is describing the texture of bird droppings'
+      )
+      if (mapped) texture = DROPPING_TEXTURES.find(t => t.label === mapped)
+    }
 
     if (!texture) {
       await ctx.reply('Please select a dropping texture from the options.')

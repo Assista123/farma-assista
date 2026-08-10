@@ -4,6 +4,7 @@ const {
 } = require('../services/litterService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
+const { mapToOption } = require('../utils/optionMapper')
 
 async function startLitterLogging(ctx, session) {
   // Only relevant for broiler flocks
@@ -84,7 +85,16 @@ async function handleLitterStep(ctx, session) {
       '🔴 Very wet': 'VERY_WET'
     }
 
-    const moisture = moistureMap[input]
+    let moisture = moistureMap[input]
+
+    if (!moisture) {
+      const mapped = await mapToOption(
+        input,
+        Object.keys(moistureMap),
+        'Farmer is describing litter moisture condition'
+      )
+      if (mapped) moisture = moistureMap[mapped]
+    }
 
     if (!moisture) {
       await ctx.reply('Please select an option from the buttons.')
