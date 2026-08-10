@@ -20,7 +20,8 @@ const INTENTS = [
   'CLOSE_FLOCK',
   'NEW_FLOCK',
   'GENERAL_QUESTION',
-  'UNKNOWN'
+  'UNKNOWN',
+  'UNDO_LAST_ENTRY'
 ]
 
 async function detectIntent(message, farmerName) {
@@ -37,7 +38,8 @@ async function detectIntent(message, farmerName) {
       `- "feed don finish" or "feed don exhaust" = CHECK_STOCK\n` +
       `- "birds dey sick" or "dem dey die" = HEALTH_DIAGNOSIS\n` +
       `- Respond with ONLY the intent name, nothing else\n` +
-      `- No explanation, no punctuation, just the intent`
+      `- No explanation, no punctuation, just the intent` +
+      `- "I make mistake" or "correct am" or "undo" or "cancel last" = UNDO_LAST_ENTRY\n`
 
     const result = await model.generateContent(prompt)
     const intent = result.response.text().trim().toUpperCase()
