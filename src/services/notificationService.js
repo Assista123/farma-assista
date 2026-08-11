@@ -302,5 +302,6 @@ module.exports = {
   runThresholdChecks,
   logNotification,
   buildDailyCheckin,
-  sendDiagnosisFollowups
+  sendDiagnosisFollowups,
+  getActiveFarmers
 }
