@@ -578,7 +578,12 @@ bot.on('message:text', async (ctx) => {
 
       case 'GENERAL_QUESTION':
         const answer = await generateResponse(
-          `The farmer asked: "${input}". Answer their poultry farming question briefly and helpfully.`,
+          `The farmer asked: "${input}".\n\n` +
+          `Answer their question based ONLY on what Farma Assista can actually do.\n` +
+          `If they want to correct a record, tell them to use the undo button within 5 minutes, ` +
+          `or send a correction message like: "Correction — [what needs to be fixed]".\n` +
+          `If their question is about a farming topic, answer it briefly and accurately.\n` +
+          `Never mention or suggest features that do not exist in Farma Assista.`,
           {
             farmer_name: session.farmer_name,
             farm_name: session.farm_name,
