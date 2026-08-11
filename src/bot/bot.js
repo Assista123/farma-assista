@@ -576,7 +576,38 @@ bot.on('message:text', async (ctx) => {
         )
         break
 
-      case 'GENERAL_QUESTION':
+      case 'UNDO_LAST_ENTRY': {
+        const undoEntry = await getUndoEntry(farmerId)
+        if (!undoEntry) {
+          await ctx.reply(
+            'The 5-minute undo window has passed for your last entry.\n\n' +
+            'To correct it send a message like this:\n\n' +
+            '"Correction — [what needs to be fixed]"\n\n' +
+            'For example: "Correction — I logged 15kg feed but it should be 12kg for May Broiler on 5 August"',
+            mainMenuKeyboard
+          )
+        } else {
+          await ctx.reply(
+            `Are you sure you want to undo this entry?\n\n` +
+            `❌ ${undoEntry.description}\n\n` +
+            `This cannot be reversed.`,
+            {
+              reply_markup: {
+                keyboard: [
+                  [{ text: '✅ Yes, undo it' }, { text: '❌ No, keep it' }],
+                  [{ text: '🏠 Main Menu' }]
+                ],
+                resize_keyboard: true
+              }
+            }
+          )
+          session.current_flow = 'UNDO_CONFIRM'
+          await saveSession(farmerId, session)
+        }
+        break
+      }
+      
+      case 'GENERAL_QUESTION': {
         const answer = await generateResponse(
           `The farmer asked: "${input}".\n\n` +
           `Answer their question based ONLY on what Farma Assista can actually do.\n` +
@@ -599,7 +630,7 @@ bot.on('message:text', async (ctx) => {
           )
         }
         break
-
+      }
       default:
         await ctx.reply(
           `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
