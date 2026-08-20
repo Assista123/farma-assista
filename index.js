@@ -17,6 +17,40 @@ app.get('/', (req, res) => {
   })
 })
 
+// WhatsApp webhook verification
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode']
+  const token = req.query['hub.verify_token']
+  const challenge = req.query['hub.challenge']
+
+  if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    console.log('Webhook verified successfully')
+    res.status(200).send(challenge)
+  } else {
+    res.sendStatus(403)
+  }
+})
+
+// WhatsApp webhook incoming messages
+app.post('/webhook', (req, res) => {
+  const body = req.body
+
+  if (body.object === 'whatsapp_business_account') {
+    body.entry?.forEach(entry => {
+      entry.changes?.forEach(change => {
+        if (change.value?.messages) {
+          change.value.messages.forEach(message => {
+            console.log('Incoming WhatsApp message:', JSON.stringify(message))
+          })
+        }
+      })
+    })
+    res.sendStatus(200)
+  } else {
+    res.sendStatus(404)
+  }
+})
+
 // Start server
 const PORT = process.env.PORT || 3000
 
