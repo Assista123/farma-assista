@@ -46,6 +46,43 @@ async function showVaccinationSchedule(ctx, session) {
 }
 
 async function handleVaccinationStep(ctx, session) {
+    // Handle free-text confirmation outside of active flow steps
+  if (!currentStep || currentStep === 'ASK_FLOCK') {
+    const lowerInput = input.toLowerCase()
+    const isDoneConfirmation = 
+      lowerInput.includes('done') || 
+      lowerInput.includes('administered') || 
+      lowerInput.includes('given') ||
+      lowerInput.includes('vaccinated')
+
+    if (isDoneConfirmation && session.active_flocks.length === 1) {
+      // Get upcoming vaccinations for the single flock
+      const upcoming = await getUpcomingVaccinations(session.active_flocks[0].id)
+      const dueSoon = upcoming.filter(v => {
+        const daysUntil = Math.ceil(
+          (new Date(v.scheduled_date) - new Date()) / (1000 * 60 * 60 * 24)
+        )
+        return daysUntil <= 1
+      })
+
+      if (dueSoon.length === 1) {
+        // Only one due — mark it administered automatically
+        await markAdministered(dueSoon[0].id)
+
+        session.current_flow = null
+        session.current_step = null
+        session.collected_data = {}
+        await saveSession(session.farmer_id, session)
+
+        await ctx.reply(
+          `✅ ${dueSoon[0].vaccination_schedules?.vaccine_name} marked as administered for ${session.active_flocks[0].flock_name}!\n\n` +
+          `Great job keeping your flock protected. 💪`,
+          mainMenuKeyboard
+        )
+        return
+      }
+    }
+  }
   const input = ctx.message.text.trim()
   const currentStep = session.current_step
 
