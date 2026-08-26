@@ -1,3 +1,4 @@
+cat > /home/ubuntu/farma-assista/src/utils/intentDetector.js << 'EOF'
 const model = require('../config/gemini')
 
 const INTENTS = [
@@ -37,10 +38,10 @@ async function detectIntent(message, farmerName) {
       `- Understand misspellings and broken English\n` +
       `- "feed don finish" or "feed don exhaust" = CHECK_STOCK\n` +
       `- "birds dey sick" or "dem dey die" = HEALTH_DIAGNOSIS\n` +
+      `- "I make mistake" or "correct am" or "undo" or "cancel last" = UNDO_LAST_ENTRY\n` +
+      `- "vaccination done" or "I've vaccinated" or "vacc done" or "I gave the vaccine" = CHECK_VACCINATION\n` +
       `- Respond with ONLY the intent name, nothing else\n` +
-      `- No explanation, no punctuation, just the intent` +
-      `- "I make mistake" or "correct am" or "undo" or "cancel last" = UNDO_LAST_ENTRY` +
-            `- "vaccination done" or "I've vaccinated" or "vacc done" or "I gave the vaccine" = CHECK_VACCINATION\n` +
+      `- No explanation, no punctuation, just the intent`
 
     const result = await model.generateContent(prompt)
     const intent = result.response.text().trim().toUpperCase()
@@ -58,3 +59,4 @@ async function detectIntent(message, farmerName) {
 }
 
 module.exports = { detectIntent }
+EOF
