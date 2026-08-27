@@ -5,7 +5,26 @@ const { getUpcomingVaccinations } = require('./vaccinationService')
 const { checkConsecutiveWetLitter } = require('./litterService')
 const { getActiveWithdrawals } = require('./drugService')
 
-// Log a notification to the database
+// ── 24-HOUR WINDOW CHECK ──────────────────────────────────────
+async function isWithin24Hours(farmerId) {
+  try {
+    const { data, error } = await supabase
+      .from('farmers')
+      .select('last_message_at')
+      .eq('id', farmerId)
+      .single()
+
+    if (error || !data?.last_message_at) return false
+
+    const hoursSince = (Date.now() - new Date(data.last_message_at)) / (1000 * 60 * 60)
+    return hoursSince < 24
+  } catch (err) {
+    console.error('Error checking 24hr window:', err.message)
+    return false
+  }
+}
+
+// ── LOG NOTIFICATION ─────────────────────────────────────────
 async function logNotification(farmerId, type, subtype, message) {
   try {
     const { error } = await supabase
@@ -27,7 +46,7 @@ async function logNotification(farmerId, type, subtype, message) {
   }
 }
 
-// Get notification preferences for a farmer
+// ── GET PREFERENCES ──────────────────────────────────────────
 async function getPreferences(farmerId) {
   try {
     const { data, error } = await supabase
@@ -37,13 +56,12 @@ async function getPreferences(farmerId) {
       .single()
 
     if (error && error.code === 'PGRST116') {
-      // No preferences set — return defaults
       return {
         daily_checkin: true,
         stock_alerts: true,
         health_alerts: true,
         performance_alerts: true,
-        preferred_time: '06:00:00'
+        preferred_time: '08:00:00'
       }
     }
 
@@ -55,7 +73,7 @@ async function getPreferences(farmerId) {
   }
 }
 
-// Get all active farmers
+// ── GET ACTIVE FARMERS ───────────────────────────────────────
 async function getActiveFarmers() {
   try {
     const { data, error } = await supabase
@@ -71,7 +89,7 @@ async function getActiveFarmers() {
   }
 }
 
-// Build daily check-in message for a farmer
+// ── BUILD DAILY CHECK-IN MESSAGE ─────────────────────────────
 async function buildDailyCheckin(farmer) {
   try {
     const { data: flocks, error } = await supabase
@@ -87,7 +105,7 @@ async function buildDailyCheckin(farmer) {
 
     let message = `Good morning ${farmer.name}! 🌅\n\n`
 
-    // Check upcoming vaccinations for ALL flocks
+    // Vaccination alerts
     let vaccinationAlerts = []
     for (const flock of flocks) {
       const upcoming = await getUpcomingVaccinations(flock.id)
@@ -97,39 +115,33 @@ async function buildDailyCheckin(farmer) {
         )
         return daysUntil <= 1
       })
-
       for (const vacc of dueToday) {
         vaccinationAlerts.push(
           `• ${flock.flock_name}: ${vacc.vaccination_schedules?.vaccine_name}`
         )
       }
     }
-
     if (vaccinationAlerts.length > 0) {
       message += `💉 Vaccination due today:\n${vaccinationAlerts.join('\n')}\n\n`
     }
 
-    // Check low stock for ALL flocks
+    // Low stock alerts
     let stockAlerts = []
     for (const flock of flocks) {
       const feedSummary = await getFeedSummary(flock.id)
       const dailyRate = await getDailyUsageRate(flock.id)
-
       if (feedSummary && dailyRate > 0) {
         const daysRemaining = Math.floor(feedSummary.current_stock_kg / dailyRate)
         if (daysRemaining <= 3) {
-          stockAlerts.push(
-            `• ${flock.flock_name}: ~${daysRemaining} days of feed remaining`
-          )
+          stockAlerts.push(`• ${flock.flock_name}: ~${daysRemaining} days of feed remaining`)
         }
       }
     }
-
     if (stockAlerts.length > 0) {
       message += `📦 Low stock alert:\n${stockAlerts.join('\n')}\n\n`
     }
 
-    // Check withdrawal periods for ALL flocks
+    // Withdrawal period alerts
     let withdrawalAlerts = []
     for (const flock of flocks) {
       const withdrawals = await getActiveWithdrawals(flock.id)
@@ -142,18 +154,16 @@ async function buildDailyCheckin(farmer) {
         }
       }
     }
-
     if (withdrawalAlerts.length > 0) {
       message += `✅ Withdrawal periods ending today:\n${withdrawalAlerts.join('\n')}\n\n`
     }
 
-    // Summary for ALL flocks
+    // Flock summary
     message += `Your flocks today:\n`
     for (const flock of flocks) {
       const ageDays = getBirdAgeDays(flock.start_date)
       message += `• ${flock.flock_name} — ${ageDays} days old, ${flock.current_bird_count} birds\n`
     }
-
     message += `\nReady to log today's feed? 🌾`
 
     return message
@@ -163,7 +173,7 @@ async function buildDailyCheckin(farmer) {
   }
 }
 
-// Check for alerts that need to be sent
+// ── CHECK ALERTS (VACCINATION + LITTER) ──────────────────────
 async function checkAlerts(farmer, bot) {
   try {
     const { data: flocks, error } = await supabase
@@ -171,26 +181,25 @@ async function checkAlerts(farmer, bot) {
       .select('*')
       .eq('farmer_id', farmer.id)
       .eq('is_active', true)
+      .gt('current_bird_count', 0)
 
     if (error || !flocks || flocks.length === 0) return
 
     for (const flock of flocks) {
-      // Check wet litter alert
+      // Wet litter alert
       const wetDays = await checkConsecutiveWetLitter(flock.id)
       if (wetDays >= 3) {
         const message =
           `⚠️ Wet Litter Alert — ${flock.flock_name}\n\n` +
           `Your litter has been wet for ${wetDays} consecutive days.\n\n` +
-          `This significantly increases risk of:\n` +
-          `• Coccidiosis\n` +
-          `• Respiratory disease\n\n` +
+          `This significantly increases risk of Coccidiosis and Respiratory Disease.\n\n` +
           `Please change litter and improve ventilation immediately.`
 
         await bot.api.sendMessage(farmer.phone_number, message)
         await logNotification(farmer.id, 'ALERT', 'WET_LITTER', message)
       }
 
-      // Check upcoming vaccinations
+      // Vaccination due tomorrow
       const upcoming = await getUpcomingVaccinations(flock.id)
       const dueTomorrow = upcoming.filter(v => {
         const daysUntil = Math.ceil(
@@ -217,9 +226,9 @@ async function checkAlerts(farmer, bot) {
   }
 }
 
-// Send daily check-in to all farmers
+// ── SEND DAILY MORNING CHECK-IN ──────────────────────────────
 async function sendDailyCheckins(bot) {
-  console.log('Sending daily check-ins...')
+  console.log('Sending morning check-ins...')
   const farmers = await getActiveFarmers()
 
   for (const farmer of farmers) {
@@ -227,42 +236,99 @@ async function sendDailyCheckins(bot) {
       const prefs = await getPreferences(farmer.id)
       if (!prefs || !prefs.daily_checkin) continue
 
+      if (!await isWithin24Hours(farmer.id)) {
+        console.log(`Skipping morning check-in for ${farmer.name} — outside 24hr window`)
+        continue
+      }
+
       const message = await buildDailyCheckin(farmer)
       if (!message) continue
 
       await bot.api.sendMessage(farmer.phone_number, message)
-      await logNotification(farmer.id, 'DAILY_CHECKIN', null, message)
-
-      // Small delay between messages to avoid rate limiting
+      await logNotification(farmer.id, 'DAILY_CHECKIN', 'MORNING', message)
       await new Promise(resolve => setTimeout(resolve, 100))
     } catch (err) {
-      console.error(`Error sending checkin to ${farmer.phone_number}:`, err.message)
+      console.error(`Morning check-in error for ${farmer.phone_number}:`, err.message)
     }
   }
 
-  console.log(`Daily check-ins sent to ${farmers.length} farmers`)
+  console.log(`Morning check-ins sent to ${farmers.length} farmers`)
 }
 
-// Run threshold checks for all farmers
-async function runThresholdChecks(bot) {
-  console.log('Running threshold checks...')
+// ── SEND AFTERNOON NUDGE (1PM) ───────────────────────────────
+async function sendMiddayNudge(bot) {
+  console.log('Sending afternoon nudge...')
   const farmers = await getActiveFarmers()
+  const today = new Date().toISOString().split('T')[0]
 
   for (const farmer of farmers) {
     try {
-      const prefs = await getPreferences(farmer.id)
-      if (!prefs || !prefs.health_alerts) continue
+      if (!await isWithin24Hours(farmer.id)) {
+        console.log(`Skipping afternoon nudge for ${farmer.name} — outside 24hr window`)
+        continue
+      }
 
-      await checkAlerts(farmer, bot)
+      // Check if farmer has logged anything today
+      const { data: logs } = await supabase
+        .from('feed_consumption_logs')
+        .select('id')
+        .eq('farmer_id', farmer.id)
+        .gte('created_at', today)
+        .limit(1)
 
+      if (logs && logs.length > 0) continue
+
+      const message =
+        `👋 ${farmer.name}, afternoon check-in!\n\n` +
+        `You haven't logged anything today yet.\n\n` +
+        `Don't forget to log your feed and check on your birds. 🐔`
+
+      await bot.api.sendMessage(farmer.phone_number, message)
+      await logNotification(farmer.id, 'ALERT', 'AFTERNOON_NUDGE', message)
       await new Promise(resolve => setTimeout(resolve, 100))
     } catch (err) {
-      console.error(`Error checking alerts for ${farmer.phone_number}:`, err.message)
+      console.error(`Afternoon nudge error for ${farmer.phone_number}:`, err.message)
     }
   }
 }
 
-// Send diagnosis follow-up messages
+// ── SEND EVENING NUDGE (6PM) ─────────────────────────────────
+async function sendEveningNudge(bot) {
+  console.log('Sending evening nudge...')
+  const farmers = await getActiveFarmers()
+  const today = new Date().toISOString().split('T')[0]
+
+  for (const farmer of farmers) {
+    try {
+      if (!await isWithin24Hours(farmer.id)) {
+        console.log(`Skipping evening nudge for ${farmer.name} — outside 24hr window`)
+        continue
+      }
+
+      const { data: logs } = await supabase
+        .from('feed_consumption_logs')
+        .select('id')
+        .eq('farmer_id', farmer.id)
+        .gte('created_at', today)
+        .limit(1)
+
+      if (logs && logs.length > 0) continue
+
+      const message =
+        `🌙 ${farmer.name}, evening check-in!\n\n` +
+        `End your day right — log today's feed and any observations.\n\n` +
+        `It only takes 2 minutes. 🐔`
+
+      await bot.api.sendMessage(farmer.phone_number, message)
+      await logNotification(farmer.id, 'ALERT', 'EVENING_NUDGE', message)
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (err) {
+      console.error(`Evening nudge error for ${farmer.phone_number}:`, err.message)
+    }
+  }
+}
+
+// ── SEND DIAGNOSIS FOLLOW-UPS ────────────────────────────────
 async function sendDiagnosisFollowups(bot) {
   try {
     const { getPendingFollowups } = require('./healthService')
@@ -271,6 +337,11 @@ async function sendDiagnosisFollowups(bot) {
     for (const followup of followups) {
       const farmer = followup.flocks?.farmers
       if (!farmer) continue
+
+      if (!await isWithin24Hours(farmer.id)) {
+        console.log(`Skipping diagnosis followup for ${farmer.name} — outside 24hr window`)
+        continue
+      }
 
       const message =
         `👋 Health Follow-up — ${followup.flocks.flock_name}\n\n` +
@@ -289,7 +360,6 @@ async function sendDiagnosisFollowups(bot) {
       })
 
       await logNotification(farmer.id, 'FOLLOWUP', 'HEALTH_DIAGNOSIS_FOLLOWUP', message)
-
       await new Promise(resolve => setTimeout(resolve, 100))
     }
   } catch (err) {
@@ -297,8 +367,33 @@ async function sendDiagnosisFollowups(bot) {
   }
 }
 
+// ── THRESHOLD CHECKS ─────────────────────────────────────────
+async function runThresholdChecks(bot) {
+  console.log('Running threshold checks...')
+  const farmers = await getActiveFarmers()
+
+  for (const farmer of farmers) {
+    try {
+      const prefs = await getPreferences(farmer.id)
+      if (!prefs || !prefs.health_alerts) continue
+
+      if (!await isWithin24Hours(farmer.id)) {
+        console.log(`Skipping threshold check for ${farmer.name} — outside 24hr window`)
+        continue
+      }
+
+      await checkAlerts(farmer, bot)
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (err) {
+      console.error(`Threshold check error for ${farmer.phone_number}:`, err.message)
+    }
+  }
+}
+
 module.exports = {
   sendDailyCheckins,
+  sendMiddayNudge,
+  sendEveningNudge,
   runThresholdChecks,
   logNotification,
   buildDailyCheckin,

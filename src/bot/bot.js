@@ -69,6 +69,7 @@ const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
 const { deleteRecord } = require('../services/undoService')
+const supabase = require('../config/database')
 const {
   handleRecountResponse,
   isRecountPending
@@ -133,6 +134,7 @@ const farmManagementKeyboard = {
   }
 }
 
+
 bot.on('message:text', async (ctx) => {
   const farmerId = ctx.from.id.toString()
   const input = ctx.message.text.trim()
@@ -146,6 +148,15 @@ bot.on('message:text', async (ctx) => {
     }
 
     session.last_active = new Date().toISOString()
+
+        // Update last message timestamp for 24hr window tracking
+    if (session.farmer_db_id) {
+      supabase
+        .from('farmers')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', session.farmer_db_id)
+        .then(() => {}) // fire and forget — don't block the message handler
+    }
 
     // Is farmer registered?
     if (!session.is_registered) {
