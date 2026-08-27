@@ -1,4 +1,3 @@
-cat > /home/ubuntu/farma-assista/src/utils/intentDetector.js << 'EOF'
 const model = require('../config/gemini')
 
 const INTENTS = [
@@ -46,7 +45,6 @@ async function detectIntent(message, farmerName) {
     const result = await model.generateContent(prompt)
     const intent = result.response.text().trim().toUpperCase()
 
-    // Validate the returned intent is in our list
     if (INTENTS.includes(intent)) {
       return intent
     }
@@ -59,4 +57,3 @@ async function detectIntent(message, farmerName) {
 }
 
 module.exports = { detectIntent }
-EOF
