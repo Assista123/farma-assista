@@ -34,23 +34,31 @@ app.get('/webhook', (req, res) => {
 })
 
 // WhatsApp webhook incoming messages
-app.post('/webhook', (req, res) => {
-  const body = req.body
+const { handleWhatsAppMessage } = require('./src/whatsapp/handler')
 
-  if (body.object === 'whatsapp_business_account') {
-    body.entry?.forEach(entry => {
-      entry.changes?.forEach(change => {
-        if (change.value?.messages) {
-          change.value.messages.forEach(message => {
-            console.log('Incoming WhatsApp message:', JSON.stringify(message))
-          })
-        }
+// WhatsApp webhook incoming messages
+app.post('/webhook', async (req, res) => {
+  res.sendStatus(200) // acknowledge immediately
+
+  const body = req.body
+  if (body.object !== 'whatsapp_business_account') return
+
+  body.entry?.forEach(entry => {
+    entry.changes?.forEach(change => {
+      const messages = change.value?.messages
+      if (!messages) return
+
+      messages.forEach(async (message) => {
+        if (message.type !== 'text') return // handle text only for now
+
+        const from = message.from
+        const text = message.text?.body || ''
+
+        console.log(`WhatsApp message from ${from}: "${text}"`)
+        await handleWhatsAppMessage(from, text)
       })
     })
-    res.sendStatus(200)
-  } else {
-    res.sendStatus(404)
-  }
+  })
 })
 
 // Start server
