@@ -5,6 +5,7 @@ const { saveSession } = require('../utils/sessionManager')
 const { getFeedSummary } = require('../services/feedService')
 const { mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
 async function startWeightLogging(ctx, session) {
   const broilerFlocks = session.active_flocks.filter(f => f.type === 'BROILER')
@@ -37,21 +38,10 @@ async function startWeightLogging(ctx, session) {
     const flock = broilerFlocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_WEIGHT_1'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await ctx.reply(
-      `⚖️ Weight Log — ${flock.flock_name}\n\n` +
-      `Pick 5 birds randomly from different parts of the pen and weigh them one by one.\n\n` +
-      `Enter the weight of bird 1 in kg:\n` +
-      `For example: 1.85`,
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await askLogDate(ctx)
     return
   }
 
@@ -63,6 +53,20 @@ async function startWeightLogging(ctx, session) {
     {
       reply_markup: {
         keyboard: flockButtons,
+        resize_keyboard: true
+      }
+    }
+  )
+}
+
+async function askFirstWeightPrompt(ctx) {
+  await ctx.reply(
+    `Pick 5 birds randomly and weigh them one by one.\n\n` +
+    `Enter the weight of bird 1 in kg:\n` +
+    `For example: 1.85`,
+    {
+      reply_markup: {
+        keyboard: [[{ text: '🏠 Main Menu' }]],
         resize_keyboard: true
       }
     }
@@ -85,20 +89,35 @@ async function handleWeightStep(ctx, session) {
 
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_WEIGHT_1'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await ctx.reply(
-      `Pick 5 birds randomly and weigh them one by one.\n\n` +
-      `Enter the weight of bird 1 in kg:\n` +
-      `For example: 1.85`,
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await askLogDate(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_WEIGHT_1'
+    await saveSession(session.farmer_id, session)
+    await askFirstWeightPrompt(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_WEIGHT_1'
+    await saveSession(session.farmer_id, session)
+    await askFirstWeightPrompt(ctx)
     return
   }
 
@@ -144,6 +163,7 @@ async function handleWeightStep(ctx, session) {
 
       await ctx.reply(
         `All 5 weights recorded!\n\n` +
+        `📅 Date: ${formatDisplayDate(session.collected_data.log_date)}\n` +
         `Bird 1: ${weights[0]}kg\n` +
         `Bird 2: ${weights[1]}kg\n` +
         `Bird 3: ${weights[2]}kg\n` +
@@ -197,14 +217,14 @@ async function handleWeightStep(ctx, session) {
 
 async function saveWeight(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
 
   const flock = await getFlockById(data.flock_id)
-  const birdAgeDays = getBirdAgeDays(flock.start_date)
+  const birdAgeDays = getBirdAgeDays(flock.start_date, logDate)
 
   const weight = await logWeight({
     flock_id: data.flock_id,
-    date: today,
+    date: logDate,
     bird_age_days: birdAgeDays,
     weight_1_kg: data.weights[0],
     weight_2_kg: data.weights[1],
@@ -303,6 +323,7 @@ async function saveWeight(ctx, session) {
 
   await ctx.reply(
     `✅ Weight recorded!\n\n` +
+    `📅 Date: ${formatDisplayDate(logDate)}\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `📅 Age: ${birdAgeDays} days\n` +
     `⚖️ Average weight: ${weight.average_weight_kg}kg` +

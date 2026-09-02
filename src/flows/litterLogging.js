@@ -6,6 +6,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
 async function startLitterLogging(ctx, session) {
   // Only relevant for broiler flocks
@@ -34,10 +35,10 @@ async function startLitterLogging(ctx, session) {
     const flock = broilerFlocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_MOISTURE'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await askMoisture(ctx, flock.flock_name)
+    await askLogDate(ctx)
     return
   }
 
@@ -71,10 +72,35 @@ async function handleLitterStep(ctx, session) {
 
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_MOISTURE'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await askMoisture(ctx, flock.flock_name)
+    await askLogDate(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_MOISTURE'
+    await saveSession(session.farmer_id, session)
+    await askMoisture(ctx, session.collected_data.flock_name)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_MOISTURE'
+    await saveSession(session.farmer_id, session)
+    await askMoisture(ctx, session.collected_data.flock_name)
     return
   }
 
@@ -132,7 +158,7 @@ async function handleLitterStep(ctx, session) {
     await saveSession(session.farmer_id, session)
 
     await ctx.reply(
-      `How is the smell in the pen today?`,
+      `How is the smell in the pen?`,
       {
         reply_markup: {
           keyboard: [
@@ -167,7 +193,7 @@ async function handleLitterStep(ctx, session) {
     await saveSession(session.farmer_id, session)
 
     await ctx.reply(
-      `Did you add fresh sawdust or litter material today?`,
+      `Did you add fresh sawdust or litter material?`,
       {
         reply_markup: {
           keyboard: [
@@ -234,7 +260,7 @@ async function handleLitterStep(ctx, session) {
 async function askMoisture(ctx, flockName) {
   await ctx.reply(
     `🪹 Litter Condition — ${flockName}\n\n` +
-    `How would you describe the litter moisture today?\n\n` +
+    `How would you describe the litter moisture?\n\n` +
     `💡 Good litter should be dry and crumbly — ` +
     `like dry soil you can break apart easily.`,
     {
@@ -270,6 +296,7 @@ async function showConfirmation(ctx, session) {
 
   await ctx.reply(
     `Please confirm litter condition:\n\n` +
+    `📅 Date: ${formatDisplayDate(data.log_date)}\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `💧 Moisture: ${moistureLabels[data.moisture_level]}\n` +
     `🧱 Caking: ${data.caking ? '⚠️ Yes' : '✅ No'}\n` +
@@ -291,11 +318,11 @@ async function showConfirmation(ctx, session) {
 
 async function saveLitterCondition(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
 
   const log = await logLitterCondition({
     flock_id: data.flock_id,
-    date: today,
+    date: logDate,
     moisture_level: data.moisture_level,
     caking: data.caking,
     odour_level: data.odour_level,
@@ -375,6 +402,7 @@ async function saveLitterCondition(ctx, session) {
 
   await ctx.reply(
     `✅ Litter condition recorded!\n\n` +
+    `📅 Date: ${formatDisplayDate(logDate)}\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `💧 Moisture: ${data.moisture_level.replace('_', ' ')}\n` +
     `👃 Odour: ${data.odour_level}\n` +

@@ -4,6 +4,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
 async function startEggProductionLogging(ctx, session) {
   const layerFlocks = session.active_flocks.filter(f => f.type === 'LAYER')
@@ -34,19 +35,10 @@ async function startEggProductionLogging(ctx, session) {
     const flock = layerFlocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_EGGS_COLLECTED'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await ctx.reply(
-      `🥚 Egg Production — ${flock.flock_name}\n\n` +
-      `How many eggs did you collect today?`,
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await askLogDate(ctx)
     return
   }
 
@@ -58,6 +50,18 @@ async function startEggProductionLogging(ctx, session) {
     {
       reply_markup: {
         keyboard: flockButtons,
+        resize_keyboard: true
+      }
+    }
+  )
+}
+
+async function askEggsCollectedPrompt(ctx, flockName) {
+  await ctx.reply(
+    `How many eggs did you collect from ${flockName}?`,
+    {
+      reply_markup: {
+        keyboard: [[{ text: '🏠 Main Menu' }]],
         resize_keyboard: true
       }
     }
@@ -80,18 +84,35 @@ async function handleEggProductionStep(ctx, session) {
 
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_EGGS_COLLECTED'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await ctx.reply(
-      `How many eggs did you collect today from ${flock.flock_name}?`,
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await askLogDate(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_EGGS_COLLECTED'
+    await saveSession(session.farmer_id, session)
+    await askEggsCollectedPrompt(ctx, session.collected_data.flock_name)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_EGGS_COLLECTED'
+    await saveSession(session.farmer_id, session)
+    await askEggsCollectedPrompt(ctx, session.collected_data.flock_name)
     return
   }
 
@@ -101,7 +122,7 @@ async function handleEggProductionStep(ctx, session) {
     if (isNaN(count)) {
       const mapped = await mapToNumber(
         input,
-        'Farmer is entering number of eggs collected today'
+        'Farmer is entering number of eggs collected'
       )
       if (mapped !== null) count = Math.floor(mapped)
     }
@@ -320,7 +341,7 @@ async function handleEggProductionStep(ctx, session) {
 
 async function askEggSize(ctx) {
   await ctx.reply(
-    'How do the eggs look in size today?',
+    'How do the eggs look in size?',
     {
       reply_markup: {
         keyboard: [
@@ -351,7 +372,8 @@ async function showConfirmation(ctx, session) {
   }
 
   await ctx.reply(
-    `Please confirm today's egg production:\n\n` +
+    `Please confirm this egg production log:\n\n` +
+    `📅 Date: ${formatDisplayDate(data.log_date)}\n` +
     `🥚 Eggs collected: ${data.eggs_collected}\n` +
     `💔 Broken eggs: ${data.broken_eggs}\n` +
     `📏 Egg size: ${sizeLabels[data.egg_size_concern]}\n` +
@@ -372,14 +394,14 @@ async function showConfirmation(ctx, session) {
 
 async function saveEggProduction(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
 
   const flock = await getFlockById(data.flock_id)
-  const birdAgeDays = getBirdAgeDays(flock.start_date)
+  const birdAgeDays = getBirdAgeDays(flock.start_date, logDate)
 
   const log = await logEggProduction({
     flock_id: data.flock_id,
-    date: today,
+    date: logDate,
     bird_age_days: birdAgeDays,
     eggs_collected: data.eggs_collected,
     broken_eggs: data.broken_eggs,
@@ -442,6 +464,7 @@ async function saveEggProduction(ctx, session) {
 
   await ctx.reply(
     `✅ Egg production recorded!\n\n` +
+    `📅 Date: ${formatDisplayDate(logDate)}\n` +
     `🥚 Eggs collected: ${data.eggs_collected}\n` +
     `💔 Broken: ${data.broken_eggs}\n` +
     `✅ Good eggs: ${data.eggs_collected - data.broken_eggs}\n` +

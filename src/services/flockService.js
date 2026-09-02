@@ -107,11 +107,14 @@ async function closeFlock(flockId) {
   }
 }
 
-// Calculate bird age in days
-function getBirdAgeDays(startDate) {
+// Calculate bird age in days.
+// Pass referenceDate (a log's date string) when computing age for a backdated
+// entry — otherwise age is calculated relative to now, which is wrong for
+// anything logged for a past date.
+function getBirdAgeDays(startDate, referenceDate = null) {
   const start = new Date(startDate)
-  const today = new Date()
-  const diffTime = Math.abs(today - start)
+  const ref = referenceDate ? new Date(referenceDate) : new Date()
+  const diffTime = Math.abs(ref - start)
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return diffDays
 }

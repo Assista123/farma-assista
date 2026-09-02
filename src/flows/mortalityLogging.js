@@ -6,6 +6,7 @@ const { askRecountPrompt } = require('../utils/recountHelper')
 const { mainMenuKeyboard } = require('../utils/keyboards')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
 const CAUSES = [
   { label: 'Newcastle Disease', value: 'NEWCASTLE' },
@@ -30,20 +31,10 @@ async function startMortalityLogging(ctx, session) {
     const flock = session.active_flocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_COUNT'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await ctx.reply(
-      `💀 Mortality Log — ${flock.flock_name}\n\n` +
-      `Sorry to hear about the loss. 😔\n\n` +
-      `How many birds did you lose?`,
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await askLogDate(ctx)
     return
   }
 
@@ -55,6 +46,19 @@ async function startMortalityLogging(ctx, session) {
     {
       reply_markup: {
         keyboard: flockButtons,
+        resize_keyboard: true
+      }
+    }
+  )
+}
+
+async function askBirdCount(ctx, flockName) {
+  await ctx.reply(
+    `Sorry to hear about the loss. 😔\n\n` +
+    `How many birds did you lose from ${flockName}?`,
+    {
+      reply_markup: {
+        keyboard: [[{ text: '🏠 Main Menu' }]],
         resize_keyboard: true
       }
     }
@@ -75,19 +79,35 @@ async function handleMortalityStep(ctx, session) {
 
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_COUNT'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
 
-    await ctx.reply(
-      `Sorry to hear about the loss. 😔\n\n` +
-      `How many birds did you lose from ${flock.flock_name}?`,
-      {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
-      }
-    )
+    await askLogDate(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_COUNT'
+    await saveSession(session.farmer_id, session)
+    await askBirdCount(ctx, session.collected_data.flock_name)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_COUNT'
+    await saveSession(session.farmer_id, session)
+    await askBirdCount(ctx, session.collected_data.flock_name)
     return
   }
 
@@ -232,6 +252,7 @@ async function showConfirmation(ctx, session) {
 
   await ctx.reply(
     `Please confirm this mortality record:\n\n` +
+    `📅 Date: ${formatDisplayDate(data.log_date)}\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `💀 Birds lost: ${data.count}\n` +
     `🦠 Cause: ${causeText}\n\n` +
@@ -250,13 +271,13 @@ async function showConfirmation(ctx, session) {
 
 async function saveMortality(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
 
   const flock = await getFlockById(data.flock_id)
   const birdAgeDays = getBirdAgeDays(flock.start_date)
   const ageCategory = getAgeCategory(flock.type, birdAgeDays)
 
-  const totalExpenses = await getTotalExpensesToDate(data.flock_id, today)
+  const totalExpenses = await getTotalExpensesToDate(data.flock_id, logDate)
   const costPerBird = data.bird_count_before_event > 0
     ? totalExpenses / data.bird_count_before_event
     : 0
@@ -264,7 +285,7 @@ async function saveMortality(ctx, session) {
 
   const mortality = await logMortality({
     flock_id: data.flock_id,
-    date: today,
+    date: logDate,
     count: data.count,
     bird_age_days: birdAgeDays,
     age_category: ageCategory,
@@ -307,17 +328,20 @@ async function saveMortality(ctx, session) {
       `Would you like to run a health check?`
   }
 
+  // Get flock reference for the suggestion before clearing session data
+  const flockForSuggestion = session.active_flocks.find(f => f.id === data.flock_id) || null
+
   // Clear flow before recount prompt
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
   await saveSession(session.farmer_id, session)
 
-const suggestion = await suggestNextAction(session, { type: 'MORTALITY', flock })
-
+  const suggestion = await suggestNextAction(session, { type: 'MORTALITY', flock: flockForSuggestion })
 
   await ctx.reply(
     `✅ Mortality recorded.\n\n` +
+    `📅 Date: ${formatDisplayDate(logDate)}\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `💀 Birds lost: ${data.count}\n` +
     `💰 Estimated loss: ₦${actualLoss.toFixed(0)}` +

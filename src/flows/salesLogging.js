@@ -4,6 +4,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
 // Start sales logging
 async function startSalesLogging(ctx, session) {
@@ -47,6 +48,24 @@ async function startSalesLogging(ctx, session) {
     await saveSession(session.farmer_id, session)
     await askWhichFlock(ctx, session, 'LAYER')
     return
+  }
+}
+
+async function askQuantityPrompt(ctx, session) {
+  const data = session.collected_data
+
+  if (data.sale_type === 'BIRDS') {
+    const flockDetails = await getFlockById(data.flock_id)
+    await ctx.reply(
+      `🐔 Bird Sale — ${data.flock_name}\n\n` +
+      `You currently have ${flockDetails.current_bird_count} birds.\n\n` +
+      `How many birds are you selling?`
+    )
+  } else {
+    await ctx.reply(
+      `🥚 Egg Sale — ${data.flock_name}\n\n` +
+      `How many eggs are you selling?`
+    )
   }
 }
 
@@ -102,24 +121,40 @@ async function handleSalesStep(ctx, session) {
 
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
+    session.current_step = 'ASK_DATE'
+    await saveSession(session.farmer_id, session)
+    await askLogDate(ctx)
+    return
+  }
+
+  // ASK_DATE
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
     session.current_step = session.collected_data.sale_type === 'BIRDS'
       ? 'ASK_BIRD_COUNT'
       : 'ASK_EGG_COUNT'
     await saveSession(session.farmer_id, session)
+    await askQuantityPrompt(ctx, session)
+    return
+  }
 
-    if (session.collected_data.sale_type === 'BIRDS') {
-      const flockDetails = await getFlockById(flock.id)
-      await ctx.reply(
-        `🐔 Bird Sale — ${flock.flock_name}\n\n` +
-        `You currently have ${flockDetails.current_bird_count} birds.\n\n` +
-        `How many birds are you selling?`
-      )
-    } else {
-      await ctx.reply(
-        `🥚 Egg Sale — ${flock.flock_name}\n\n` +
-        `How many eggs are you selling?`
-      )
-    }
+  // ASK_DATE_CUSTOM
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
+    session.current_step = session.collected_data.sale_type === 'BIRDS'
+      ? 'ASK_BIRD_COUNT'
+      : 'ASK_EGG_COUNT'
+    await saveSession(session.farmer_id, session)
+    await askQuantityPrompt(ctx, session)
     return
   }
 
@@ -248,24 +283,9 @@ async function askWhichFlock(ctx, session, flockType) {
     const flock = relevantFlocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = session.collected_data.sale_type === 'BIRDS'
-      ? 'ASK_BIRD_COUNT'
-      : 'ASK_EGG_COUNT'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
-
-    if (session.collected_data.sale_type === 'BIRDS') {
-      const flockDetails = await getFlockById(flock.id)
-      await ctx.reply(
-        `🐔 Bird Sale — ${flock.flock_name}\n\n` +
-        `You currently have ${flockDetails.current_bird_count} birds.\n\n` +
-        `How many birds are you selling?`
-      )
-    } else {
-      await ctx.reply(
-        `🥚 Egg Sale — ${flock.flock_name}\n\n` +
-        `How many eggs are you selling?`
-      )
-    }
+    await askLogDate(ctx)
     return
   }
 
@@ -297,6 +317,7 @@ async function showConfirmation(ctx, session) {
 
   await ctx.reply(
     `Please confirm this sale:\n\n` +
+    `📅 Date: ${formatDisplayDate(data.log_date)}\n` +
     `${isBird ? '🐔' : '🥚'} ${quantity} ${unit}\n` +
     `💰 Price per ${isBird ? 'bird' : 'egg'}: ₦${data.unit_price_naira.toLocaleString()}\n` +
     `💵 Total: ₦${total.toLocaleString()}\n` +
@@ -318,7 +339,7 @@ async function showConfirmation(ctx, session) {
 // Save sale to database
 async function saveSale(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
   const isBird = data.sale_type === 'BIRDS'
 
   let sale
@@ -326,7 +347,7 @@ async function saveSale(ctx, session) {
   if (isBird) {
     sale = await logBirdSale({
       flock_id: data.flock_id,
-      date: today,
+      date: logDate,
       bird_count: data.bird_count,
       unit_price_naira: data.unit_price_naira,
       total_amount_naira: data.total_amount_naira,
@@ -335,7 +356,7 @@ async function saveSale(ctx, session) {
   } else {
     sale = await logEggSale({
       flock_id: data.flock_id,
-      date: today,
+      date: logDate,
       egg_count: data.egg_count,
       unit_price_naira: data.unit_price_naira,
       total_amount_naira: data.total_amount_naira,
@@ -390,6 +411,7 @@ async function saveSale(ctx, session) {
 
   await ctx.reply(
     `✅ Sale recorded!\n\n` +
+    `📅 Date: ${formatDisplayDate(logDate)}\n` +
     `${isBird ? '🐔' : '🥚'} ${quantity} ${unit} sold\n` +
     `💵 Total: ₦${data.total_amount_naira.toLocaleString()}\n` +
     `👤 Buyer: ${data.buyer_name || 'Not specified'}\n` +

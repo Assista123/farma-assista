@@ -3,6 +3,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
 const CATEGORIES = [
   { label: '💉 Drugs & medication', value: 'DRUGS' },
@@ -101,9 +102,9 @@ async function handleExpenseStep(ctx, session) {
         (sum, f) => sum + (f.current_bird_count || 0), 0
       )
       session.collected_data.total_farm_birds = totalBirds
-      session.current_step = 'ASK_AMOUNT'
+      session.current_step = 'ASK_DATE'
       await saveSession(session.farmer_id, session)
-      await askAmount(ctx)
+      await askLogDate(ctx)
       return
     }
 
@@ -116,6 +117,31 @@ async function handleExpenseStep(ctx, session) {
 
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
+    session.current_step = 'ASK_DATE'
+    await saveSession(session.farmer_id, session)
+    await askLogDate(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_AMOUNT'
+    await saveSession(session.farmer_id, session)
+    await askAmount(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
     session.current_step = 'ASK_AMOUNT'
     await saveSession(session.farmer_id, session)
     await askAmount(ctx)
@@ -191,9 +217,9 @@ async function askFlockOrFarm(ctx, session) {
     const flock = session.active_flocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_AMOUNT'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
-    await askAmount(ctx)
+    await askLogDate(ctx)
     return
   }
 
@@ -231,6 +257,7 @@ async function showConfirmation(ctx, session) {
 
   await ctx.reply(
     `Please confirm this expense:\n\n` +
+    `📅 Date: ${formatDisplayDate(data.log_date)}\n` +
     `📋 Category: ${categoryName}\n` +
     `🐔 For: ${data.flock_name}\n` +
     `💰 Amount: ₦${data.amount_naira.toLocaleString()}\n` +
@@ -250,12 +277,12 @@ async function showConfirmation(ctx, session) {
 
 async function saveExpense(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
 
   const expense = await logExpense({
     farmer_id: session.farmer_db_id,
     flock_id: data.flock_id,
-    date: today,
+    date: logDate,
     category: data.category,
     custom_category_name: data.custom_category_name || null,
     amount_naira: data.amount_naira,
@@ -297,6 +324,7 @@ async function saveExpense(ctx, session) {
 
   await ctx.reply(
     `✅ Expense recorded!\n\n` +
+    `📅 Date: ${formatDisplayDate(logDate)}\n` +
     `📋 ${data.custom_category_name || data.category_label}\n` +
     `💰 ₦${data.amount_naira.toLocaleString()}\n` +
     `🐔 For: ${data.flock_name}` +
