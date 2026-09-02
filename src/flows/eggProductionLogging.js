@@ -3,6 +3,7 @@ const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 async function startEggProductionLogging(ctx, session) {
   const layerFlocks = session.active_flocks.filter(f => f.type === 'LAYER')
@@ -437,6 +438,8 @@ async function saveEggProduction(ctx, session) {
     }
   }
 
+  const suggestion = await suggestNextAction(session, { type: 'EGG_PRODUCTION', flock })
+
   await ctx.reply(
     `✅ Egg production recorded!\n\n` +
     `🥚 Eggs collected: ${data.eggs_collected}\n` +
@@ -446,7 +449,7 @@ async function saveEggProduction(ctx, session) {
     performanceMessage +
     sizeWarning +
     brokenWarning +
-    `\n\nWhat would you like to do next?`,
+    (suggestion || ''),
     {
       reply_markup: {
         keyboard: [

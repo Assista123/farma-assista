@@ -5,6 +5,7 @@ const {
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 async function startLitterLogging(ctx, session) {
   // Only relevant for broiler flocks
@@ -317,6 +318,8 @@ async function saveLitterCondition(ctx, session) {
   // Check consecutive wet litter days
   const wetDays = await checkConsecutiveWetLitter(data.flock_id)
 
+  const flock = session.active_flocks.find(f => f.id === data.flock_id) || null
+
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -368,6 +371,8 @@ async function saveLitterCondition(ctx, session) {
       `Increase ventilation immediately and change litter as soon as possible.`
   }
 
+  const suggestion = await suggestNextAction(session, { type: 'LITTER_LOG', flock })
+
   await ctx.reply(
     `✅ Litter condition recorded!\n\n` +
     `🐔 Flock: ${data.flock_name}\n` +
@@ -375,7 +380,7 @@ async function saveLitterCondition(ctx, session) {
     `👃 Odour: ${data.odour_level}\n` +
     `🪵 Sawdust added: ${data.sawdust_added ? 'Yes' : 'No'}` +
     advisory +
-    `\n\nWhat would you like to do next?`,
+    (suggestion || ''),
     {
       reply_markup: {
         keyboard: [

@@ -5,6 +5,7 @@ const { saveSession } = require('../utils/sessionManager')
 const { askRecountPrompt } = require('../utils/recountHelper')
 const { mainMenuKeyboard } = require('../utils/keyboards')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 const CAUSES = [
   { label: 'Newcastle Disease', value: 'NEWCASTLE' },
@@ -312,25 +313,17 @@ async function saveMortality(ctx, session) {
   session.collected_data = {}
   await saveSession(session.farmer_id, session)
 
+const suggestion = await suggestNextAction(session, { type: 'MORTALITY', flock })
+
+
   await ctx.reply(
     `✅ Mortality recorded.\n\n` +
     `🐔 Flock: ${data.flock_name}\n` +
     `💀 Birds lost: ${data.count}\n` +
-    `🐣 Remaining birds: ${newCount}\n` +
-    `📅 Age: ${birdAgeDays} days (${ageCategory})\n` +
     `💰 Estimated loss: ₦${actualLoss.toFixed(0)}` +
-    alertMessage,
-    highMortality
-      ? {
-          reply_markup: {
-            keyboard: [
-              [{ text: '❤️ Run Health Check' }],
-              [{ text: '🏠 Main Menu' }]
-            ],
-            resize_keyboard: true
-          }
-        }
-      : mainMenuKeyboard
+    alertMessage +
+    (suggestion || ''),
+    mainMenuKeyboard
   )
 
   // Ask recount prompt after mortality

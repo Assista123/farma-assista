@@ -3,6 +3,7 @@ const { getFlockById, updateBirdCount } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 // Start sales logging
 async function startSalesLogging(ctx, session) {
@@ -76,7 +77,7 @@ async function handleSalesStep(ctx, session) {
       return
     }
 
-    if (saleinput === '🥚 Selling eggs') {
+    if (saleInput === '🥚 Selling eggs') {
       session.collected_data.sale_type = 'EGGS'
       session.current_step = 'ASK_FLOCK'
       await saveSession(session.farmer_id, session)
@@ -372,6 +373,8 @@ async function saveSale(ctx, session) {
       : `Sale of ${data.egg_count} eggs for ₦${data.total_amount_naira.toLocaleString()} from ${data.flock_name}`
   })
 
+  const flock = session.active_flocks.find(f => f.id === data.flock_id) || null
+
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -380,13 +383,18 @@ async function saveSale(ctx, session) {
   const quantity = isBird ? data.bird_count : data.egg_count
   const unit = isBird ? 'birds' : 'eggs'
 
+  const suggestion = await suggestNextAction(session, {
+    type: isBird ? 'BIRD_SALE' : 'EGG_SALE',
+    flock
+  })
+
   await ctx.reply(
     `✅ Sale recorded!\n\n` +
     `${isBird ? '🐔' : '🥚'} ${quantity} ${unit} sold\n` +
     `💵 Total: ₦${data.total_amount_naira.toLocaleString()}\n` +
     `👤 Buyer: ${data.buyer_name || 'Not specified'}\n` +
-    `🐔 Flock: ${data.flock_name}\n\n` +
-    `What would you like to do next?`,
+    `🐔 Flock: ${data.flock_name}` +
+    (suggestion || ''),
     {
       reply_markup: {
         keyboard: [

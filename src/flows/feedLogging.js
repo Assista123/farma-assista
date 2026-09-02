@@ -6,6 +6,8 @@ const {
 } = require('../services/feedService')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
+const { mainMenuKeyboard } = require('../utils/keyboards')
 
 async function startFeedLogging(ctx, session) {
   session.current_flow = 'FEED_LOGGING'
@@ -308,6 +310,8 @@ async function saveFeedPurchase(ctx, session) {
     return
   }
 
+  const flock = session.active_flocks.find(f => f.id === data.flock_id) || null
+
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -315,25 +319,17 @@ async function saveFeedPurchase(ctx, session) {
 
   const costPerKg = (data.cost_naira / data.quantity_kg).toFixed(0)
 
+  const suggestion = await suggestNextAction(session, { type: 'FEED_PURCHASE', flock })
+
   await ctx.reply(
     `✅ Feed purchase recorded!\n\n` +
     `🌾 Feed type: ${data.feed_type}\n` +
     `📦 Quantity: ${data.quantity_kg}kg\n` +
     `💰 ₦${data.cost_naira.toLocaleString()}\n` +
     `📊 ₦${costPerKg} per kg\n` +
-    `🐔 Flock: ${data.flock_name}\n\n` +
-    `What would you like to do next?`,
-
-    // saveFeedPurchase
-    {
-      reply_markup: {
-        keyboard: [
-          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
-          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
-        ],
-        resize_keyboard: true
-      }
-    }
+    `🐔 Flock: ${data.flock_name}` +
+    (suggestion || ''),
+    mainMenuKeyboard
   )
 }
 
@@ -360,6 +356,8 @@ async function saveFeedConsumption(ctx, session) {
     table: 'feed_consumption_logs',
     description: `${data.quantity_kg}kg ${data.feed_type} for ${data.flock_name}`
   })
+
+  const flock = session.active_flocks.find(f => f.id === data.flock_id) || null
 
   const summary = await getFeedSummary(data.flock_id)
   const dailyRate = await getDailyUsageRate(data.flock_id)
@@ -390,23 +388,15 @@ async function saveFeedConsumption(ctx, session) {
     stockMessage += `\n${indicator} ~${daysRemaining} days remaining`
   }
 
+  const suggestion = await suggestNextAction(session, { type: 'FEED_CONSUMPTION', flock })
+
   await ctx.reply(
     `✅ Feed consumption recorded!\n\n` +
     `🌾 ${data.quantity_kg}kg ${data.feed_type}\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
-    `${stockMessage}\n\n` +
-    `What would you like to do next?`,
-
-    // saveFeedConsumption 
-    {
-      reply_markup: {
-        keyboard: [
-          [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
-          [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
-        ],
-        resize_keyboard: true
-      }
-    }
+    `${stockMessage}` +
+    (suggestion || ''),
+    mainMenuKeyboard
   )
 }
 

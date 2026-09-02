@@ -4,6 +4,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { getFeedSummary } = require('../services/feedService')
 const { mapToNumber } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 async function startWeightLogging(ctx, session) {
   const broilerFlocks = session.active_flocks.filter(f => f.type === 'BROILER')
@@ -277,14 +278,13 @@ async function saveWeight(ctx, session) {
       `For accurate FCR calculations log daily feed consumption.`
   } else {
     // Check how many days have been logged vs flock age
-    const flock = await getFlockById(data.flock_id)
-    const ageDays = getBirdAgeDays(flock.start_date)
+    const ageDays = birdAgeDays
     const expectedLogs = ageDays
     const { data: consumptionLogs } = await require('../config/database')
       .from('feed_consumption_logs')
       .select('date')
       .eq('flock_id', data.flock_id)
-    
+
     const actualLogs = consumptionLogs ? consumptionLogs.length : 0
     const coveragePercent = Math.round((actualLogs / expectedLogs) * 100)
 
@@ -299,6 +299,8 @@ async function saveWeight(ctx, session) {
     }
   }
 
+  const suggestion = await suggestNextAction(session, { type: 'WEIGHT_LOG', flock })
+
   await ctx.reply(
     `✅ Weight recorded!\n\n` +
     `🐔 Flock: ${data.flock_name}\n` +
@@ -306,7 +308,7 @@ async function saveWeight(ctx, session) {
     `⚖️ Average weight: ${weight.average_weight_kg}kg` +
     benchmarkMessage +
     feedWarning +
-    `\n\nWhat would you like to do next?`,
+    (suggestion || ''),
     {
       reply_markup: {
         keyboard: [

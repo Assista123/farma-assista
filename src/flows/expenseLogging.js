@@ -2,6 +2,7 @@ const { logExpense } = require('../services/expenseService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 const CATEGORIES = [
   { label: '💉 Drugs & medication', value: 'DRUGS' },
@@ -274,6 +275,11 @@ async function saveExpense(ctx, session) {
     description: `₦${data.amount_naira.toLocaleString()} expense for ${data.flock_name}`
   })
 
+  // flock_id is null for whole-farm expenses — no single flock to pass in that case
+  const flock = data.flock_id
+    ? session.active_flocks.find(f => f.id === data.flock_id) || null
+    : null
+
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -287,13 +293,15 @@ async function saveExpense(ctx, session) {
       `by bird count in your profit reports.`
   }
 
+  const suggestion = await suggestNextAction(session, { type: 'EXPENSE', flock })
+
   await ctx.reply(
     `✅ Expense recorded!\n\n` +
     `📋 ${data.custom_category_name || data.category_label}\n` +
     `💰 ₦${data.amount_naira.toLocaleString()}\n` +
     `🐔 For: ${data.flock_name}` +
     allocationNote +
-    `\n\nWhat would you like to do next?`,
+    (suggestion || ''),
     {
       reply_markup: {
         keyboard: [

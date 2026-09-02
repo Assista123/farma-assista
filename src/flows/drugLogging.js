@@ -3,6 +3,7 @@ const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { mainMenuKeyboard, buildGridKeyboard } = require('../utils/keyboards')
 const { mapToOption } = require('../utils/optionMapper')
+const { suggestNextAction } = require('../utils/nextActionHelper')
 
 // Common drugs used in Nigerian poultry farming
 const COMMON_DRUGS = [
@@ -343,6 +344,8 @@ async function saveDrugLog(ctx, session) {
     description: `${data.drug_name} administered to ${data.flock_name}`
   })
 
+  const flock = session.active_flocks.find(f => f.id === data.flock_id) || null
+
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -361,6 +364,8 @@ async function saveDrugLog(ctx, session) {
     costNote = `\n💰 Cost recorded: ₦${data.cost_naira.toLocaleString()}`
   }
 
+  const suggestion = await suggestNextAction(session, { type: 'DRUG_LOG', flock })
+
   await ctx.reply(
     `✅ Drug log recorded!\n\n` +
       `💊 ${data.drug_name}\n` +
@@ -368,7 +373,7 @@ async function saveDrugLog(ctx, session) {
       `🦠 Treating: ${data.condition_treated || 'Not specified'}` +
       costNote +
       withdrawalWarning +
-      `\n\nWhat would you like to do next?`,
+      (suggestion || ''),
     mainMenuKeyboard
   )
 }
