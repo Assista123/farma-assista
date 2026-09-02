@@ -1,16 +1,16 @@
 require('dotenv').config()
-
 const express = require('express')
 const app = express()
 const bot = require('./src/bot/bot')
 const { startScheduler } = require('./src/scheduler')
 const path = require('path')
+const { handleWhatsAppMessage } = require('./src/whatsapp/handler')
 
-// Middleware
-// Serve static website files
-app.use(express.static(path.join(__dirname, 'public')))
+// Middleware — must be before all routes
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
-// Health check (still available)
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -34,14 +34,12 @@ app.get('/webhook', (req, res) => {
 })
 
 // WhatsApp webhook incoming messages
-const { handleWhatsAppMessage } = require('./src/whatsapp/handler')
-
-// WhatsApp webhook incoming messages
 app.post('/webhook', async (req, res) => {
-  res.sendStatus(200) // acknowledge immediately
+  console.log('Webhook POST received:', JSON.stringify(req.body || {}).slice(0, 200))
+  res.sendStatus(200)
 
   const body = req.body
-  if (body.object !== 'whatsapp_business_account') return
+  if (!body || body.object !== 'whatsapp_business_account') return
 
   body.entry?.forEach(entry => {
     entry.changes?.forEach(change => {
@@ -49,7 +47,7 @@ app.post('/webhook', async (req, res) => {
       if (!messages) return
 
       messages.forEach(async (message) => {
-        if (message.type !== 'text') return // handle text only for now
+        if (message.type !== 'text') return
 
         const from = message.from
         const text = message.text?.body || ''
@@ -63,7 +61,6 @@ app.post('/webhook', async (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000
-
 app.listen(PORT, () => {
   console.log(`Farma Assista server running on port ${PORT}`)
 })
@@ -74,5 +71,8 @@ console.log('Farma Assista bot is running')
 
 // Start scheduler
 startScheduler(bot)
+
+// Serve website static files AFTER API routes
+app.use(express.static(path.join(__dirname, 'public')))
 
 module.exports = app

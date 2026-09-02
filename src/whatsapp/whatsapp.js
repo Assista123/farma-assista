@@ -6,6 +6,7 @@ const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN
 // Send a text message to a WhatsApp number
 async function sendMessage(to, text) {
   try {
+    console.log(`Attempting to send to ${to}: "${text.slice(0, 50)}"`)
     const response = await axios.post(
       `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
       {
@@ -21,9 +22,10 @@ async function sendMessage(to, text) {
         }
       }
     )
+    console.log(`Message sent successfully to ${to}:`, JSON.stringify(response.data))
     return response.data
   } catch (err) {
-    console.error('WhatsApp send error:', err.response?.data || err.message)
+    console.error(`WhatsApp send FAILED to ${to}:`, JSON.stringify(err.response?.data || err.message))
     return null
   }
 }

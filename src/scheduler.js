@@ -62,4 +62,4 @@ function startScheduler(bot) {
   console.log('  Evening vaccination:       6:30 PM')
 }
 
-module.exports = { startScheduler },
+module.exports = { startScheduler }

@@ -28,8 +28,9 @@ const { generateResponse } = require('../utils/responseGenerator')
 
 // Build a WhatsApp-compatible ctx object that mirrors the Telegram ctx API
 function buildCtx(to) {
-  return {
+    return {
     reply: async (text, options) => {
+      console.log(`Sending WhatsApp reply to ${to}: "${text.slice(0, 80)}"`)
       // Extract keyboard buttons if present
       const keyboard = options?.reply_markup?.keyboard
       if (keyboard && keyboard.length > 0) {
@@ -80,6 +81,7 @@ async function handleWhatsAppMessage(from, messageText) {
     }
 
     session.last_active = new Date().toISOString()
+    console.log(`Processing WhatsApp message from ${farmerId}: "${input}" | registered: ${session.is_registered}`)
 
     // Track last message for 24hr window
     if (session.farmer_db_id) {
