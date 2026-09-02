@@ -1,87 +1,70 @@
-const { logMortality, getTotalExpensesToDate } = require('../services/mortalityService')
-const { getFlockById, getBirdAgeDays, getAgeCategory, updateBirdCount } = require('../services/flockService')
+const { logFeedPurchase, logFeedConsumption, getFeedSummary, getDailyUsageRate } = require('../services/feedService')
+const { getFlockById } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
-const { askRecountPrompt } = require('../utils/recountHelper')
 const { mainMenuKeyboard } = require('../utils/keyboards')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
 const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
-const CAUSES = [
-  { label: 'Newcastle Disease', value: 'NEWCASTLE' },
-  { label: 'Coccidiosis', value: 'COCCIDIOSIS' },
-  { label: 'Cholera', value: 'CHOLERA' },
-  { label: 'Gumboro Disease', value: 'GUMBORO' },
-  { label: 'Typhoid', value: 'TYPHOID' },
-  { label: 'Cold / Heat Stress', value: 'COLD_STRESS' },
-  { label: 'Dehydration', value: 'DEHYDRATION' },
-  { label: 'Yolk Sac Infection', value: 'YOLK_SAC_INFECTION' },
-  { label: 'Unknown', value: 'UNKNOWN' },
-  { label: 'Other (specify)', value: 'OTHER' }
-]
-
-async function startMortalityLogging(ctx, session) {
-  session.current_flow = 'MORTALITY_LOGGING'
-  session.current_step = 'ASK_FLOCK'
+async function startFeedLogging(ctx, session) {
+  session.current_flow = 'FEED_LOGGING'
+  session.current_step = 'ASK_FEED_ACTION'
   session.collected_data = {}
   await saveSession(session.farmer_id, session)
 
-  if (session.active_flocks.length === 1) {
-    const flock = session.active_flocks[0]
-    session.collected_data.flock_id = flock.id
-    session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_DATE'
-    await saveSession(session.farmer_id, session)
-
-    await askLogDate(ctx)
-    return
-  }
-
-  const flockButtons = session.active_flocks.map(f => [{ text: f.flock_name }])
-  flockButtons.push([{ text: '🏠 Main Menu' }])
-
   await ctx.reply(
-    '💀 Mortality Log\n\nWhich flock did you lose birds from?',
+    '🌾 Feed Logging\n\nWhat would you like to log?',
     {
       reply_markup: {
-        keyboard: flockButtons,
+        keyboard: [
+          [{ text: '🛒 I bought feed' }, { text: '🍽️ I fed the birds' }],
+          [{ text: '📊 Check feed stock' }],
+          [{ text: '🏠 Main Menu' }]
+        ],
         resize_keyboard: true
       }
     }
   )
 }
 
-async function askBirdCount(ctx, flockName) {
-  await ctx.reply(
-    `Sorry to hear about the loss. 😔\n\n` +
-    `How many birds did you lose from ${flockName}?`,
-    {
-      reply_markup: {
-        keyboard: [[{ text: '🏠 Main Menu' }]],
-        resize_keyboard: true
-      }
-    }
-  )
-}
-
-async function handleMortalityStep(ctx, session) {
+async function handleFeedLoggingStep(ctx, session) {
   const input = ctx.message.text.trim()
   const currentStep = session.current_step
 
+  if (currentStep === 'ASK_FEED_ACTION') {
+    if (input === '🛒 I bought feed') {
+      session.collected_data.action = 'PURCHASE'
+      session.current_step = 'ASK_FLOCK'
+      await saveSession(session.farmer_id, session)
+      await askWhichFlock(ctx, session)
+      return
+    }
+    if (input === '🍽️ I fed the birds') {
+      session.collected_data.action = 'CONSUMPTION'
+      session.current_step = 'ASK_FLOCK'
+      await saveSession(session.farmer_id, session)
+      await askWhichFlock(ctx, session)
+      return
+    }
+    if (input === '📊 Check feed stock') {
+      await showFeedStock(ctx, session)
+      return
+    }
+    await ctx.reply('Please use the buttons to select an option.')
+    return
+  }
+
   if (currentStep === 'ASK_FLOCK') {
     const flock = session.active_flocks.find(f => f.flock_name === input)
-
     if (!flock) {
       await ctx.reply('Please select a flock from the options.')
       return
     }
-
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
     session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
-
     await askLogDate(ctx)
     return
   }
@@ -95,9 +78,9 @@ async function handleMortalityStep(ctx, session) {
       return
     }
     session.collected_data.log_date = result
-    session.current_step = 'ASK_COUNT'
+    session.current_step = 'ASK_FEED_TYPE'
     await saveSession(session.farmer_id, session)
-    await askBirdCount(ctx, session.collected_data.flock_name)
+    await askFeedType(ctx, session)
     return
   }
 
@@ -105,60 +88,115 @@ async function handleMortalityStep(ctx, session) {
     const result = await handleDateInput(ctx, input)
     if (result === null || result === 'AWAITING_CUSTOM_DATE') return
     session.collected_data.log_date = result
-    session.current_step = 'ASK_COUNT'
+    session.current_step = 'ASK_FEED_TYPE'
     await saveSession(session.farmer_id, session)
-    await askBirdCount(ctx, session.collected_data.flock_name)
+    await askFeedType(ctx, session)
     return
   }
 
-  if (currentStep === 'ASK_COUNT') {
-    let count = parseInt(input)
-
-    if (isNaN(count)) {
-      const mapped = await mapToNumber(
-        input,
-        'Farmer is entering number of birds that died'
-      )
-      if (mapped !== null) count = Math.floor(mapped)
+  if (currentStep === 'ASK_FEED_TYPE') {
+    const feedTypeMap = {
+      'Starter (0-2 weeks)': 'STARTER',
+      'Grower (2-4 weeks)': 'GROWER',
+      'Finisher (4-8 weeks)': 'FINISHER',
+      'Starter (0-8 weeks)': 'LAYER_STARTER',
+      'Grower (8-18 weeks)': 'LAYER_GROWER',
+      'Layer (18 weeks+)': 'LAYER'
     }
 
-    if (isNaN(count) || count < 1) {
-      await ctx.reply(
-        'Please enter a valid number.\nFor example: 5'
-      )
+    let feedType = feedTypeMap[input]
+    if (!feedType) {
+      const mapped = await mapToOption(input, Object.keys(feedTypeMap), 'Farmer selecting feed type')
+      if (mapped) feedType = feedTypeMap[mapped]
+    }
+
+    if (!feedType) {
+      await ctx.reply('Please select a feed type from the options.')
       return
     }
 
-    const flock = await getFlockById(session.collected_data.flock_id)
-
-    if (count > flock.current_bird_count) {
-      await ctx.reply(
-        `You currently have ${flock.current_bird_count} birds in ${flock.flock_name}.\n\n` +
-        `You cannot log more deaths than birds available.\n\n` +
-        `How many birds did you lose?`
-      )
-      return
-    }
-
-    session.collected_data.count = count
-    session.collected_data.bird_count_before_event = flock.current_bird_count
-    session.current_step = 'ASK_CAUSE'
+    session.collected_data.feed_type = feedType
+    session.current_step = 'ASK_QUANTITY_KG'
     await saveSession(session.farmer_id, session)
 
-    const causeButtons = []
-    for (let i = 0; i < CAUSES.length; i += 2) {
-      const row = [{ text: CAUSES[i].label }]
-      if (CAUSES[i + 1]) row.push({ text: CAUSES[i + 1].label })
-      causeButtons.push(row)
+    if (session.collected_data.action === 'PURCHASE') {
+      await ctx.reply(
+        'How many kg of feed did you buy?\n\n' +
+        '💡 Tip: multiply bags × kg per bag\n' +
+        'e.g. 10 bags of 25kg = 250kg\n\n' +
+        'Enter just the number. For example: 250',
+        { reply_markup: { keyboard: [[{ text: '🏠 Main Menu' }]], resize_keyboard: true } }
+      )
+    } else {
+      await ctx.reply(
+        'How many kg did the birds consume?\n\nEnter just the number. For example: 12.5',
+        { reply_markup: { keyboard: [[{ text: '🏠 Main Menu' }]], resize_keyboard: true } }
+      )
     }
-    causeButtons.push([{ text: '🏠 Main Menu' }])
+    return
+  }
+
+  if (currentStep === 'ASK_QUANTITY_KG') {
+    let quantity = parseFloat(input)
+    if (isNaN(quantity)) {
+      const mapped = await mapToNumber(input, 'Farmer entering feed quantity in kg')
+      if (mapped !== null) quantity = mapped
+    }
+    if (isNaN(quantity) || quantity <= 0) {
+      await ctx.reply('Please enter a valid quantity in kg.\nFor example: 50')
+      return
+    }
+    session.collected_data.quantity_kg = quantity
+
+    if (session.collected_data.action === 'PURCHASE') {
+      session.current_step = 'ASK_COST'
+      await saveSession(session.farmer_id, session)
+      await ctx.reply(
+        'How much did you pay in total?\n\n' +
+        '💡 Tip: multiply bags × price per bag\n' +
+        'e.g. 10 bags × ₦7,500 = ₦75,000\n\n' +
+        'Enter the total amount in Naira. For example: 75000',
+        { reply_markup: { keyboard: [[{ text: '🏠 Main Menu' }]], resize_keyboard: true } }
+      )
+    } else {
+      await saveFeedConsumption(ctx, session)
+    }
+    return
+  }
+
+  if (currentStep === 'ASK_COST') {
+    let cost = parseFloat(input)
+    if (isNaN(cost)) {
+      const mapped = await mapToNumber(input, 'Farmer entering feed cost in Naira')
+      if (mapped !== null) cost = mapped
+    }
+    if (isNaN(cost) || cost <= 0) {
+      await ctx.reply('Please enter a valid amount in Naira.\nFor example: 25000')
+      return
+    }
+    session.collected_data.cost_naira = cost
+    session.current_step = 'CONFIRM_PURCHASE'
+    await saveSession(session.farmer_id, session)
+
+    const data = session.collected_data
+    const costPerKg = (cost / data.quantity_kg).toFixed(0)
+    const dateLabel = data.log_date === getToday() ? 'Today' : formatDisplayDate(data.log_date)
 
     await ctx.reply(
-      `What do you think caused the death${count > 1 ? 's' : ''}?\n\n` +
-      `Select the closest option:`,
+      'Please confirm your feed purchase:\n\n' +
+      `📅 Date: ${dateLabel}\n` +
+      `🌾 Feed type: ${data.feed_type}\n` +
+      `📦 Quantity: ${data.quantity_kg}kg\n` +
+      `💰 Amount: ₦${cost.toLocaleString()}\n` +
+      `📊 Cost per kg: ₦${costPerKg}\n` +
+      `🐔 Flock: ${data.flock_name}\n\n` +
+      'Is this correct?',
       {
         reply_markup: {
-          keyboard: causeButtons,
+          keyboard: [
+            [{ text: '✅ Yes, save it' }, { text: '❌ No, start over' }],
+            [{ text: '🏠 Main Menu' }]
+          ],
           resize_keyboard: true
         }
       }
@@ -166,195 +204,224 @@ async function handleMortalityStep(ctx, session) {
     return
   }
 
-  if (currentStep === 'ASK_CAUSE') {
-    let cause = CAUSES.find(c => c.label === input)
-
-    if (!cause) {
-      // Try Gemini mapping for free text
-      const mapped = await mapToOption(
-        input,
-        CAUSES.map(c => c.label),
-        'Farmer is selecting the cause of bird deaths'
-      )
-      if (mapped) {
-        cause = CAUSES.find(c => c.label === mapped)
-      }
-    }
-
-    if (!cause) {
-      await ctx.reply('Please select a cause from the options.')
-      return
-    }
-
-    session.collected_data.suspected_cause = cause.value
-
-    if (cause.value === 'OTHER') {
-      session.current_step = 'ASK_CUSTOM_CAUSE'
-      await saveSession(session.farmer_id, session)
-
-      await ctx.reply(
-        'Please describe what you think caused the death(s):',
-        {
-          reply_markup: {
-            keyboard: [[{ text: '🏠 Main Menu' }]],
-            resize_keyboard: true
-          }
-        }
-      )
-      return
-    }
-
-    session.current_step = 'CONFIRM'
-    await saveSession(session.farmer_id, session)
-    await showConfirmation(ctx, session)
-    return
-  }
-
-  if (currentStep === 'ASK_CUSTOM_CAUSE') {
-    if (input.length < 3) {
-      await ctx.reply('Please describe the cause in a few words.')
-      return
-    }
-
-    session.collected_data.custom_cause = input
-    session.current_step = 'CONFIRM'
-    await saveSession(session.farmer_id, session)
-    await showConfirmation(ctx, session)
-    return
-  }
-
-  if (currentStep === 'CONFIRM') {
+  if (currentStep === 'CONFIRM_PURCHASE') {
     if (input === '❌ No, start over') {
-      await startMortalityLogging(ctx, session)
+      await startFeedLogging(ctx, session)
       return
     }
-
     if (input !== '✅ Yes, save it') {
       await ctx.reply('Please use the buttons to confirm or start over.')
       return
     }
-
-    await saveMortality(ctx, session)
+    await saveFeedPurchase(ctx, session)
     return
   }
 }
 
-async function showConfirmation(ctx, session) {
-  const data = session.collected_data
-  const causeLabel = CAUSES.find(
-    c => c.value === data.suspected_cause
-  )?.label || data.suspected_cause
-
-  let causeText = causeLabel
-  if (data.custom_cause) {
-    causeText += ` — ${data.custom_cause}`
+async function askWhichFlock(ctx, session) {
+  if (session.active_flocks.length === 1) {
+    const flock = session.active_flocks[0]
+    session.collected_data.flock_id = flock.id
+    session.collected_data.flock_name = flock.flock_name
+    session.current_step = 'ASK_DATE'
+    await saveSession(session.farmer_id, session)
+    await askLogDate(ctx)
+    return
   }
 
-  await ctx.reply(
-    `Please confirm this mortality record:\n\n` +
-    `📅 Date: ${formatDisplayDate(data.log_date)}\n` +
-    `🐔 Flock: ${data.flock_name}\n` +
-    `💀 Birds lost: ${data.count}\n` +
-    `🦠 Cause: ${causeText}\n\n` +
-    `Is this correct?`,
-    {
-      reply_markup: {
-        keyboard: [
-          [{ text: '✅ Yes, save it' }, { text: '❌ No, start over' }],
-          [{ text: '🏠 Main Menu' }]
-        ],
-        resize_keyboard: true
-      }
-    }
-  )
+  const flockButtons = session.active_flocks.map(f => [{ text: f.flock_name }])
+  flockButtons.push([{ text: '🏠 Main Menu' }])
+
+  await ctx.reply('Which flock is this for?', {
+    reply_markup: { keyboard: flockButtons, resize_keyboard: true }
+  })
 }
 
-async function saveMortality(ctx, session) {
+async function askFeedType(ctx, session) {
+  const flock = session.active_flocks.find(f => f.id === session.collected_data.flock_id)
+  const flockType = flock?.type || 'BROILER'
+  let feedTypes = []
+
+  if (flockType === 'BROILER') {
+    feedTypes = [
+      [{ text: 'Starter (0-2 weeks)' }],
+      [{ text: 'Grower (2-4 weeks)' }],
+      [{ text: 'Finisher (4-8 weeks)' }],
+      [{ text: '🏠 Main Menu' }]
+    ]
+  } else {
+    feedTypes = [
+      [{ text: 'Starter (0-8 weeks)' }],
+      [{ text: 'Grower (8-18 weeks)' }],
+      [{ text: 'Layer (18 weeks+)' }],
+      [{ text: '🏠 Main Menu' }]
+    ]
+  }
+
+  const dateLabel = session.collected_data.log_date === getToday()
+    ? 'today'
+    : formatDisplayDate(session.collected_data.log_date)
+
+  await ctx.reply(`Logging for ${dateLabel}.\n\nWhat type of feed?`, {
+    reply_markup: { keyboard: feedTypes, resize_keyboard: true }
+  })
+}
+
+async function saveFeedPurchase(ctx, session) {
   const data = session.collected_data
   const logDate = data.log_date || getToday()
 
-  const flock = await getFlockById(data.flock_id)
-  const birdAgeDays = getBirdAgeDays(flock.start_date, logDate)
-  const ageCategory = getAgeCategory(flock.type, birdAgeDays)
-
-  const totalExpenses = await getTotalExpensesToDate(data.flock_id, logDate)
-  const costPerBird = data.bird_count_before_event > 0
-    ? totalExpenses / data.bird_count_before_event
-    : 0
-  const actualLoss = costPerBird * data.count
-
-  const mortality = await logMortality({
+  const purchase = await logFeedPurchase({
     flock_id: data.flock_id,
     date: logDate,
-    count: data.count,
-    bird_age_days: birdAgeDays,
-    age_category: ageCategory,
-    suspected_cause: data.suspected_cause,
-    custom_cause: data.custom_cause || null,
-    bird_count_before_event: data.bird_count_before_event,
-    cost_per_bird_at_death: costPerBird.toFixed(2),
-    actual_loss_naira: actualLoss.toFixed(2)
+    feed_type: data.feed_type,
+    quantity_kg: data.quantity_kg,
+    cost_naira: data.cost_naira
   })
 
-  if (!mortality) {
+  if (!purchase) {
     await ctx.reply('Sorry, something went wrong. Please try again.')
     return
   }
 
-  const newCount = data.bird_count_before_event - data.count
-  await updateBirdCount(data.flock_id, newCount)
+  const suggestion = await suggestNextAction(session, { type: 'FEED_PURCHASE', flock: null })
 
-  const flockIndex = session.active_flocks.findIndex(f => f.id === data.flock_id)
-  if (flockIndex !== -1) {
-    session.active_flocks[flockIndex].current_bird_count = newCount
-  }
-
-  await saveUndoEntry(session.farmer_id, {
-    type: 'MORTALITY',
-    record_id: mortality.id,
-    table: 'mortality_logs',
-    flock_id: data.flock_id,
-    bird_count_before_event: data.bird_count_before_event,
-    description: `${data.count} bird death(s) logged for ${data.flock_name}`
-  })
-
-  const mortalityRate = (data.count / data.bird_count_before_event) * 100
-  const highMortality = mortalityRate >= 5
-
-  let alertMessage = ''
-  if (highMortality) {
-    alertMessage =
-      `\n\n⚠️ This is a high mortality event (${mortalityRate.toFixed(1)}% of your flock). ` +
-      `Would you like to run a health check?`
-  }
-
-  // Get flock reference for the suggestion before clearing session data
-  const flockForSuggestion = session.active_flocks.find(f => f.id === data.flock_id) || null
-
-  // Clear flow before recount prompt
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
   await saveSession(session.farmer_id, session)
 
-  const suggestion = await suggestNextAction(session, { type: 'MORTALITY', flock: flockForSuggestion })
+  const costPerKg = (data.cost_naira / data.quantity_kg).toFixed(0)
+  const dateLabel = logDate === getToday() ? 'Today' : formatDisplayDate(logDate)
 
   await ctx.reply(
-    `✅ Mortality recorded.\n\n` +
-    `📅 Date: ${formatDisplayDate(logDate)}\n` +
-    `🐔 Flock: ${data.flock_name}\n` +
-    `💀 Birds lost: ${data.count}\n` +
-    `💰 Estimated loss: ₦${actualLoss.toFixed(0)}` +
-    alertMessage +
+    '✅ Feed purchase recorded!\n\n' +
+    `📅 Date: ${dateLabel}\n` +
+    `🌾 Feed type: ${data.feed_type}\n` +
+    `📦 Quantity: ${data.quantity_kg}kg\n` +
+    `💰 ₦${data.cost_naira.toLocaleString()}\n` +
+    `📊 ₦${costPerKg} per kg\n` +
+    `🐔 Flock: ${data.flock_name}` +
     (suggestion || ''),
     mainMenuKeyboard
   )
+}
 
-  // Ask recount prompt after mortality
-  await askRecountPrompt(ctx, session, data.flock_id, data.flock_name, newCount)
+async function saveFeedConsumption(ctx, session) {
+  const data = session.collected_data
+  const logDate = data.log_date || getToday()
+
+  const consumption = await logFeedConsumption({
+    flock_id: data.flock_id,
+    date: logDate,
+    feed_type: data.feed_type,
+    quantity_kg: data.quantity_kg
+  })
+
+  if (!consumption) {
+    await ctx.reply('Sorry, something went wrong. Please try again.')
+    return
+  }
+
+  await saveUndoEntry(session.farmer_id, {
+    type: 'FEED_CONSUMPTION',
+    record_id: consumption.id,
+    table: 'feed_consumption_logs',
+    description: `${data.quantity_kg}kg ${data.feed_type} for ${data.flock_name}`
+  })
+
+  const summary = await getFeedSummary(data.flock_id)
+  const dailyRate = await getDailyUsageRate(data.flock_id)
+  const daysRemaining = dailyRate > 0
+    ? Math.floor(summary.current_stock_kg / dailyRate)
+    : null
+
+  const flock = await getFlockById(data.flock_id).catch(() => null)
+  const suggestion = await suggestNextAction(session, {
+    type: 'FEED_CONSUMPTION',
+    flock: flock ? { type: flock.type, start_date: flock.start_date } : null
+  })
+
+  session.current_flow = null
+  session.current_step = null
+  session.collected_data = {}
+  await saveSession(session.farmer_id, session)
+
+  const stockKg = summary.current_stock_kg
+  const fullBags = Math.floor(stockKg / 25)
+  const remainderKg = stockKg % 25
+  let stockDisplay = ''
+  if (fullBags > 0 && remainderKg > 0) {
+    stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} + ${remainderKg.toFixed(1)}kg`
+  } else if (fullBags > 0) {
+    stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} (${stockKg.toFixed(1)}kg)`
+  } else {
+    stockDisplay = `${stockKg.toFixed(1)}kg`
+  }
+
+  let stockMessage = `📦 Current stock: ${stockDisplay}`
+  if (daysRemaining !== null) {
+    const indicator = daysRemaining <= 3 ? '⚠️' : '✅'
+    stockMessage += `\n${indicator} ~${daysRemaining} days remaining`
+  }
+
+  const dateLabel = logDate === getToday() ? 'Today' : formatDisplayDate(logDate)
+
+  await ctx.reply(
+    '✅ Feed consumption recorded!\n\n' +
+    `📅 Date: ${dateLabel}\n` +
+    `🌾 ${data.quantity_kg}kg ${data.feed_type}\n` +
+    `🐔 Flock: ${data.flock_name}\n\n` +
+    stockMessage +
+    (suggestion || ''),
+    mainMenuKeyboard
+  )
+}
+
+async function showFeedStock(ctx, session) {
+  if (session.active_flocks.length === 0) {
+    await ctx.reply('You have no active flocks.', mainMenuKeyboard)
+    return
+  }
+
+  let message = '📦 Feed Stock Summary\n\n'
+
+  for (const flock of session.active_flocks) {
+    const summary = await getFeedSummary(flock.id)
+    const dailyRate = await getDailyUsageRate(flock.id)
+    const daysRemaining = dailyRate > 0
+      ? Math.floor(summary.current_stock_kg / dailyRate)
+      : null
+
+    const stockKg = summary.current_stock_kg
+    const fullBags = Math.floor(stockKg / 25)
+    const remainderKg = stockKg % 25
+    let stockDisplay = ''
+    if (fullBags > 0 && remainderKg > 0) {
+      stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} + ${remainderKg.toFixed(1)}kg`
+    } else if (fullBags > 0) {
+      stockDisplay = `${fullBags} bag${fullBags > 1 ? 's' : ''} (${stockKg.toFixed(1)}kg)`
+    } else {
+      stockDisplay = `${stockKg.toFixed(1)}kg`
+    }
+
+    message += `🐔 ${flock.flock_name}\n`
+    message += `   Stock: ${stockDisplay}\n`
+    if (daysRemaining !== null) {
+      const indicator = daysRemaining <= 3 ? '⚠️' : '✅'
+      message += `   ${indicator} ~${daysRemaining} days remaining\n`
+    }
+    message += '\n'
+  }
+
+  session.current_flow = null
+  session.current_step = null
+  await saveSession(session.farmer_id, session)
+
+  await ctx.reply(message, mainMenuKeyboard)
 }
 
 module.exports = {
-  startMortalityLogging,
-  handleMortalityStep
+  startFeedLogging,
+  handleFeedLoggingStep
 }

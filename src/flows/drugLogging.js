@@ -1,11 +1,11 @@
 const { logDrug } = require('../services/drugService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
-const { mainMenuKeyboard, buildGridKeyboard } = require('../utils/keyboards')
+const { mainMenuKeyboard } = require('../utils/keyboards')
 const { mapToOption } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
+const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
 
-// Common drugs used in Nigerian poultry farming
 const COMMON_DRUGS = [
   'Amprolium',
   'Toltrazuril',
@@ -19,7 +19,6 @@ const COMMON_DRUGS = [
   'Other (type name)'
 ]
 
-// Common conditions
 const COMMON_CONDITIONS = [
   'Coccidiosis',
   'Newcastle Disease',
@@ -33,11 +32,6 @@ const COMMON_CONDITIONS = [
 ]
 
 async function startDrugLogging(ctx, session) {
-  if (session.active_flocks.length === 0) {
-    await ctx.reply('You have no active flocks to log drugs for.', mainMenuKeyboard)
-    return
-  }
-
   session.current_flow = 'DRUG_LOGGING'
   session.current_step = 'ASK_FLOCK'
   session.collected_data = {}
@@ -47,24 +41,24 @@ async function startDrugLogging(ctx, session) {
     const flock = session.active_flocks[0]
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
-    session.current_step = 'ASK_DRUG_NAME'
+    session.current_step = 'ASK_DATE'
     await saveSession(session.farmer_id, session)
-
-    await askDrugName(ctx, flock.flock_name)
+    await askLogDate(ctx)
     return
   }
 
-  const flockButtons = buildGridKeyboard(
-    session.active_flocks.map(f => f.flock_name),
-    2
-  )
+  const flockButtons = session.active_flocks.map(f => [{ text: f.flock_name }])
+  flockButtons.push([{ text: '🏠 Main Menu' }])
 
-  await ctx.reply('💊 Drug / Medication Log\n\nWhich flock are you treating?', {
-    reply_markup: {
-      keyboard: flockButtons,
-      resize_keyboard: true
+  await ctx.reply(
+    '💊 Drug / Medication Log\n\nWhich flock are you treating?',
+    {
+      reply_markup: {
+        keyboard: flockButtons,
+        resize_keyboard: true
+      }
     }
-  })
+  )
 }
 
 async function handleDrugStep(ctx, session) {
@@ -73,35 +67,57 @@ async function handleDrugStep(ctx, session) {
 
   if (currentStep === 'ASK_FLOCK') {
     const flock = session.active_flocks.find(f => f.flock_name === input)
-
     if (!flock) {
       await ctx.reply('Please select a flock from the options.')
       return
     }
-
     session.collected_data.flock_id = flock.id
     session.collected_data.flock_name = flock.flock_name
+    session.current_step = 'ASK_DATE'
+    await saveSession(session.farmer_id, session)
+    await askLogDate(ctx)
+    return
+  }
+
+  if (currentStep === 'ASK_DATE') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null) return
+    if (result === 'AWAITING_CUSTOM_DATE') {
+      session.current_step = 'ASK_DATE_CUSTOM'
+      await saveSession(session.farmer_id, session)
+      return
+    }
+    session.collected_data.log_date = result
     session.current_step = 'ASK_DRUG_NAME'
     await saveSession(session.farmer_id, session)
+    await askDrugName(ctx, session.collected_data.flock_name)
+    return
+  }
 
-    await askDrugName(ctx, flock.flock_name)
+  if (currentStep === 'ASK_DATE_CUSTOM') {
+    const result = await handleDateInput(ctx, input)
+    if (result === null || result === 'AWAITING_CUSTOM_DATE') return
+    session.collected_data.log_date = result
+    session.current_step = 'ASK_DRUG_NAME'
+    await saveSession(session.farmer_id, session)
+    await askDrugName(ctx, session.collected_data.flock_name)
     return
   }
 
   if (currentStep === 'ASK_DRUG_NAME') {
-    let drugName = input
-
     if (input === 'Other (type name)') {
       session.current_step = 'ASK_DRUG_NAME_CUSTOM'
       await saveSession(session.farmer_id, session)
-
       await ctx.reply('Please type the name of the drug:', {
-        reply_markup: {
-          keyboard: [[{ text: '🏠 Main Menu' }]],
-          resize_keyboard: true
-        }
+        reply_markup: { keyboard: [[{ text: '🏠 Main Menu' }]], resize_keyboard: true }
       })
       return
+    }
+
+    let drugName = input
+    if (!COMMON_DRUGS.includes(input)) {
+      const mapped = await mapToOption(input, COMMON_DRUGS, 'Farmer selecting drug name')
+      if (mapped) drugName = mapped
     }
 
     session.collected_data.drug_name = drugName
@@ -116,7 +132,6 @@ async function handleDrugStep(ctx, session) {
       await ctx.reply('Please enter a valid drug name.')
       return
     }
-
     session.collected_data.drug_name = input
     session.current_step = 'ASK_CONDITION'
     await saveSession(session.farmer_id, session)
@@ -127,11 +142,7 @@ async function handleDrugStep(ctx, session) {
   if (currentStep === 'ASK_CONDITION') {
     let condition = input
     if (input !== 'Other' && !COMMON_CONDITIONS.includes(input)) {
-      const mapped = await mapToOption(
-        input,
-        COMMON_CONDITIONS,
-        'Farmer is selecting the condition being treated'
-      )
+      const mapped = await mapToOption(input, COMMON_CONDITIONS, 'Farmer selecting condition being treated')
       condition = mapped || input
     }
     session.collected_data.condition_treated = condition === 'Other' ? null : condition
@@ -139,12 +150,12 @@ async function handleDrugStep(ctx, session) {
     await saveSession(session.farmer_id, session)
 
     await ctx.reply(
-      `What dosage did you give?\n\n` +
-        `For example:\n` +
-        `• 1 teaspoon per 4 litres of water\n` +
-        `• 1ml per kg body weight\n` +
-        `• As per manufacturer instructions\n\n` +
-        `Or tap Skip if not sure.`,
+      'What dosage did you give?\n\n' +
+      'For example:\n' +
+      '• 1 teaspoon per 4 litres of water\n' +
+      '• 1ml per kg body weight\n' +
+      '• As per manufacturer instructions\n\n' +
+      'Or tap Skip if not sure.',
       {
         reply_markup: {
           keyboard: [
@@ -165,11 +176,10 @@ async function handleDrugStep(ctx, session) {
     await saveSession(session.farmer_id, session)
 
     await ctx.reply(
-      `What is the withdrawal period for this drug?\n\n` +
-        `💡 The withdrawal period is how many days you must wait ` +
-        `after the last dose before selling birds or eggs.\n\n` +
-        `Enter number of days. For example: 7\n` +
-        `Or tap Skip if not applicable or unknown.`,
+      'What is the withdrawal period for this drug?\n\n' +
+      '💡 The withdrawal period is how many days you must wait after the last dose before selling birds or eggs.\n\n' +
+      'Enter number of days. For example: 7\n' +
+      'Or tap Skip if not applicable.',
       {
         reply_markup: {
           keyboard: [
@@ -189,24 +199,26 @@ async function handleDrugStep(ctx, session) {
     if (input === 'Skip') {
       session.collected_data.withdrawal_period_days = null
     } else {
-      const days = parseInt(input, 10)
+      const days = parseInt(input)
       if (isNaN(days) || days < 0) {
         await ctx.reply('Please enter a valid number of days or tap Skip.')
         return
       }
       session.collected_data.withdrawal_period_days = days
     }
-
     session.current_step = 'ASK_COST'
     await saveSession(session.farmer_id, session)
 
     await ctx.reply(
-      `How much did this drug cost in total?\n\n` +
-        `Enter amount in Naira. For example: 3500\n` +
-        `Or tap Skip if not sure.`,
+      'How much did this drug cost in total?\n\n' +
+      'Enter amount in Naira. For example: 3500\n' +
+      'Or tap Skip if not sure.',
       {
         reply_markup: {
-          keyboard: [[{ text: 'Skip' }], [{ text: '🏠 Main Menu' }]],
+          keyboard: [
+            [{ text: 'Skip' }],
+            [{ text: '🏠 Main Menu' }]
+          ],
           resize_keyboard: true
         }
       }
@@ -225,17 +237,19 @@ async function handleDrugStep(ctx, session) {
       }
       session.collected_data.cost_naira = cost
     }
-
     session.current_step = 'ASK_NOTES'
     await saveSession(session.farmer_id, session)
 
     await ctx.reply(
-      `Any additional notes?\n\n` +
-        `For example: Day 1 of 5-day treatment\n\n` +
-        `Or tap Skip.`,
+      'Any additional notes?\n\n' +
+      'For example: Day 1 of 5-day treatment\n\n' +
+      'Or tap Skip.',
       {
         reply_markup: {
-          keyboard: [[{ text: 'Skip' }], [{ text: '🏠 Main Menu' }]],
+          keyboard: [
+            [{ text: 'Skip' }],
+            [{ text: '🏠 Main Menu' }]
+          ],
           resize_keyboard: true
         }
       }
@@ -256,55 +270,49 @@ async function handleDrugStep(ctx, session) {
       await startDrugLogging(ctx, session)
       return
     }
-
     if (input !== '✅ Yes, save it') {
       await ctx.reply('Please use the buttons to confirm or start over.')
       return
     }
-
     await saveDrugLog(ctx, session)
     return
   }
 }
 
 async function askDrugName(ctx, flockName) {
-  const drugButtons = buildGridKeyboard(COMMON_DRUGS, 2)
+  const drugButtons = COMMON_DRUGS.map(d => [{ text: d }])
+  drugButtons.push([{ text: '🏠 Main Menu' }])
 
   await ctx.reply(
     `💊 Drug Log — ${flockName}\n\nWhat drug or medication are you giving?`,
-    {
-      reply_markup: {
-        keyboard: drugButtons,
-        resize_keyboard: true
-      }
-    }
+    { reply_markup: { keyboard: drugButtons, resize_keyboard: true } }
   )
 }
 
 async function askCondition(ctx) {
-  const conditionButtons = buildGridKeyboard(COMMON_CONDITIONS, 2)
+  const conditionButtons = COMMON_CONDITIONS.map(c => [{ text: c }])
+  conditionButtons.push([{ text: '🏠 Main Menu' }])
 
-  await ctx.reply(`What condition are you treating?`, {
-    reply_markup: {
-      keyboard: conditionButtons,
-      resize_keyboard: true
-    }
+  await ctx.reply('What condition are you treating?', {
+    reply_markup: { keyboard: conditionButtons, resize_keyboard: true }
   })
 }
 
 async function showConfirmation(ctx, session) {
   const data = session.collected_data
+  const dateLabel = data.log_date === getToday() ? 'Today' : formatDisplayDate(data.log_date)
 
   await ctx.reply(
-    `Please confirm drug log:\n\n` +
-      `💊 Drug: ${data.drug_name}\n` +
-      `🐔 Flock: ${data.flock_name}\n` +
-      `🦠 Condition: ${data.condition_treated || 'Not specified'}\n` +
-      `💉 Dosage: ${data.dosage_given || 'Not specified'}\n` +
-      `⏳ Withdrawal: ${data.withdrawal_period_days ? `${data.withdrawal_period_days} days` : 'Not applicable'}\n` +
-      `💰 Cost: ${data.cost_naira ? `₦${data.cost_naira.toLocaleString()}` : 'Not recorded'}\n` +
-      `📝 Notes: ${data.notes || 'None'}\n\n` +
-      `Is this correct?`,
+    'Please confirm drug log:\n\n' +
+    `📅 Date: ${dateLabel}\n` +
+    `💊 Drug: ${data.drug_name}\n` +
+    `🐔 Flock: ${data.flock_name}\n` +
+    `🦠 Condition: ${data.condition_treated || 'Not specified'}\n` +
+    `💉 Dosage: ${data.dosage_given || 'Not specified'}\n` +
+    `⏳ Withdrawal: ${data.withdrawal_period_days ? `${data.withdrawal_period_days} days` : 'Not applicable'}\n` +
+    `💰 Cost: ${data.cost_naira ? `₦${data.cost_naira.toLocaleString()}` : 'Not recorded'}\n` +
+    `📝 Notes: ${data.notes || 'None'}\n\n` +
+    'Is this correct?',
     {
       reply_markup: {
         keyboard: [
@@ -319,11 +327,11 @@ async function showConfirmation(ctx, session) {
 
 async function saveDrugLog(ctx, session) {
   const data = session.collected_data
-  const today = new Date().toISOString().split('T')[0]
+  const logDate = data.log_date || getToday()
 
   const log = await logDrug({
     flock_id: data.flock_id,
-    date: today,
+    date: logDate,
     drug_name: data.drug_name,
     condition_treated: data.condition_treated,
     dosage_given: data.dosage_given,
@@ -344,7 +352,7 @@ async function saveDrugLog(ctx, session) {
     description: `${data.drug_name} administered to ${data.flock_name}`
   })
 
-  const flock = session.active_flocks.find(f => f.id === data.flock_id) || null
+  const suggestion = await suggestNextAction(session, { type: 'DRUG_LOG', flock: null })
 
   session.current_flow = null
   session.current_step = null
@@ -364,16 +372,17 @@ async function saveDrugLog(ctx, session) {
     costNote = `\n💰 Cost recorded: ₦${data.cost_naira.toLocaleString()}`
   }
 
-  const suggestion = await suggestNextAction(session, { type: 'DRUG_LOG', flock })
+  const dateLabel = logDate === getToday() ? 'Today' : formatDisplayDate(logDate)
 
   await ctx.reply(
-    `✅ Drug log recorded!\n\n` +
-      `💊 ${data.drug_name}\n` +
-      `🐔 Flock: ${data.flock_name}\n` +
-      `🦠 Treating: ${data.condition_treated || 'Not specified'}` +
-      costNote +
-      withdrawalWarning +
-      (suggestion || ''),
+    '✅ Drug log recorded!\n\n' +
+    `📅 Date: ${dateLabel}\n` +
+    `💊 ${data.drug_name}\n` +
+    `🐔 Flock: ${data.flock_name}\n` +
+    `🦠 Treating: ${data.condition_treated || 'Not specified'}` +
+    costNote +
+    withdrawalWarning +
+    (suggestion || ''),
     mainMenuKeyboard
   )
 }
