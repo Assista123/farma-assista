@@ -3,118 +3,820 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assista Tech Concepts | Farma Assista</title>
+  <title>Farma Assista — Smarter Farms, Better Yields</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,wght@0,700;0,900;1,700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #0f1f35;
+      --navy-mid:#162640;
+      --navy-lt: #1e3355;
+      --gold:    #d4a030;
+      --gold-lt: #e8b84b;
+      --white:   #ffffff;
+      --grey:    #c8d4e0;
+      --grey-lt: #f0f4f8;
+      --text:    #e2eaf2;
+    }
+
+    html { scroll-behavior: smooth; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', sans-serif;
+      background: var(--navy);
+      color: var(--white);
       line-height: 1.6;
-      color: #222;
-      background: #f8f9fa;
     }
-    header {
-      background: #1a5f2a;
-      color: white;
-      padding: 1.5rem 1rem;
-      text-align: center;
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 5%;
+      height: 64px;
+      background: rgba(15,31,53,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(212,160,48,0.15);
     }
-    header h1 {
-      font-size: 1.8rem;
-      font-weight: 700;
-    }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem 1.2rem;
-    }
-    .hero {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    }
-    .hero h2 {
-      color: #1a5f2a;
-      margin-bottom: 1rem;
-      font-size: 1.4rem;
-    }
-    .hero p {
-      font-size: 1.1rem;
-      margin-bottom: 1.2rem;
-    }
-    .details {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    }
-    .details h3 {
-      color: #1a5f2a;
-      margin-bottom: 1rem;
-    }
-    .details p {
-      margin-bottom: 0.6rem;
-    }
-    .btn {
-      display: inline-block;
-      background: #25D366;
-      color: white;
-      padding: 0.9rem 1.8rem;
-      border-radius: 8px;
+
+    .nav-logo {
+      font-family: 'Fraunces', serif;
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: var(--white);
       text-decoration: none;
-      font-weight: 600;
-      margin-top: 0.5rem;
+      letter-spacing: -0.02em;
     }
-    footer {
-      background: #1a1a1a;
-      color: #ccc;
-      text-align: center;
-      padding: 2rem 1rem;
+
+    .nav-logo span { color: var(--gold); }
+
+    .nav-links {
+      display: flex; align-items: center; gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--grey);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--white); }
+
+    .btn-primary {
+      background: var(--gold);
+      color: var(--navy);
+      border: none;
+      padding: 0.6rem 1.4rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.875rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+      display: inline-block;
+    }
+
+    .btn-primary:hover { background: var(--gold-lt); transform: translateY(-1px); }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 120px 5% 80px;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0a1828 100%);
+      position: relative; overflow: hidden;
+    }
+
+    #hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 80% 50%, rgba(212,160,48,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-title {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(2.8rem, 7vw, 5rem);
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      max-width: 680px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1.05rem;
+      color: var(--grey);
+      max-width: 520px;
+      margin-bottom: 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-actions { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 4rem; }
+
+    .btn-outline {
+      color: var(--white);
+      border: 1.5px solid rgba(255,255,255,0.3);
+      padding: 0.6rem 1.4rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s;
+      display: inline-block;
+    }
+
+    .btn-outline:hover { border-color: var(--gold); background: rgba(212,160,48,0.08); }
+
+    .hero-stats {
+      display: flex; gap: 3rem; flex-wrap: wrap;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 2rem;
+    }
+
+    .stat-item { }
+    .stat-number {
+      font-family: 'Fraunces', serif;
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--white);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--grey);
+      margin-top: 0.25rem;
+      font-weight: 500;
+    }
+
+    /* ── SECTION BASE ── */
+    section {
+      padding: 100px 5%;
+    }
+
+    .section-eyebrow {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .section-title {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+
+    .section-sub {
+      font-size: 1rem;
+      color: var(--grey);
+      max-width: 540px;
+      line-height: 1.7;
+    }
+
+    /* ── ABOUT ── */
+    #about {
+      background: var(--grey-lt);
+      color: var(--navy);
+    }
+
+    #about .section-eyebrow { color: var(--gold); }
+    #about .section-title { color: var(--navy); }
+
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: start;
+      margin-top: 3rem;
+    }
+
+    .about-left { }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
       margin-top: 2rem;
     }
-    footer a {
-      color: #90ee90;
-      margin: 0 12px;
-      text-decoration: none;
-      font-size: 0.95rem;
+
+    .stat-card {
+      border-left: 3px solid var(--gold);
+      padding-left: 1rem;
     }
-    footer a:hover { text-decoration: underline; }
+
+    .stat-card .num {
+      font-family: 'Fraunces', serif;
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--navy);
+    }
+
+    .stat-card .lbl {
+      font-size: 0.8rem;
+      color: #5a7080;
+      margin-top: 0.15rem;
+    }
+
+    .about-right p {
+      font-size: 0.95rem;
+      color: #3a5060;
+      line-height: 1.8;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── FEATURES LIST ── */
+    #features { background: var(--navy); }
+
+    .features-header { max-width: 620px; margin: 0 auto 4rem; text-align: center; }
+
+    .features-list {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    .feature-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 1.1rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      gap: 2rem;
+    }
+
+    .feature-row:first-child { border-top: 1px solid rgba(255,255,255,0.08); }
+
+    .feature-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--white);
+      min-width: 200px;
+    }
+
+    .feature-desc {
+      font-size: 0.875rem;
+      color: var(--grey);
+      text-align: right;
+      flex: 1;
+    }
+
+    .feature-desc::before {
+      content: '✓ ';
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    /* ── GALLERY / IMPACT ── */
+    #gallery {
+      background: var(--grey-lt);
+      color: var(--navy);
+    }
+
+    #gallery .section-title { color: var(--navy); }
+
+    .gallery-header { text-align: center; margin-bottom: 3rem; }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .gallery-img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      border-radius: 8px;
+      display: block;
+    }
+
+    /* ── SERVICES ── */
+    #services { background: var(--navy-mid); }
+
+    .services-header { margin-bottom: 3.5rem; }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .service-card {
+      background: var(--navy-lt);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 2rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .service-card:hover {
+      border-color: rgba(212,160,48,0.4);
+      transform: translateY(-3px);
+    }
+
+    .service-icon {
+      width: 40px; height: 40px;
+      background: rgba(212,160,48,0.12);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .service-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: var(--white);
+    }
+
+    .service-card p {
+      font-size: 0.875rem;
+      color: var(--grey);
+      line-height: 1.7;
+      margin-bottom: 1rem;
+    }
+
+    .service-tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* ── QUOTE ── */
+    #quote {
+      background: var(--navy);
+      text-align: center;
+      padding: 80px 5%;
+    }
+
+    .quote-text {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+      font-style: italic;
+      font-weight: 700;
+      color: var(--white);
+      max-width: 740px;
+      margin: 0 auto;
+      line-height: 1.4;
+    }
+
+    /* ── CONTACT ── */
+    #contact {
+      background: var(--navy-mid);
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: start;
+    }
+
+    #contact .section-title { color: var(--white); }
+
+    .contact-left p {
+      font-size: 0.95rem;
+      color: var(--grey);
+      margin-bottom: 2rem;
+      line-height: 1.7;
+    }
+
+    .contact-detail {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 0.9rem;
+      color: var(--grey);
+    }
+
+    .contact-detail span:first-child { font-size: 1rem; }
+
+    .contact-form { display: flex; flex-direction: column; gap: 1rem; }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--grey);
+    }
+
+    .form-group input,
+    .form-group textarea {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      color: var(--white);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder { color: rgba(255,255,255,0.3); }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    .form-group textarea { resize: vertical; min-height: 130px; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #080f1a;
+      padding: 4rem 5% 2rem;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 3rem;
+      padding-bottom: 3rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 2rem;
+    }
+
+    .footer-brand p {
+      font-size: 0.85rem;
+      color: var(--grey);
+      line-height: 1.7;
+      margin-top: 0.75rem;
+      max-width: 240px;
+    }
+
+    .footer-col h4 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--grey);
+      margin-bottom: 1rem;
+    }
+
+    .footer-col ul { list-style: none; }
+    .footer-col ul li { margin-bottom: 0.6rem; }
+    .footer-col ul li a {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.55);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-col ul li a:hover { color: var(--white); }
+    .footer-col p {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 768px) {
+      nav { padding: 0 4%; }
+      .nav-links { display: none; }
+      .about-grid,
+      .contact-grid,
+      .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .services-grid { grid-template-columns: 1fr; }
+      .gallery-grid { grid-template-columns: 1fr 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .hero-stats { gap: 2rem; }
+      .feature-desc { text-align: left; }
+      .feature-row { flex-direction: column; gap: 0.25rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>Assista Tech Concepts</h1>
-  </header>
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">Farma<span>Assista</span></a>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#gallery">Gallery</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#contact" class="btn-primary">Get Started</a></li>
+  </ul>
+</nav>
 
-  <div class="container">
-    <section class="hero">
-      <h2>Farma Assista</h2>
-      <p>
-        <strong>Farma Assista by Assista Tech Concepts</strong> is an AI-powered poultry farm management assistant for Nigerian smallholder farmers, available on WhatsApp.
-      </p>
-      <a href="https://wa.me/2348133546296" class="btn" target="_blank">Chat on WhatsApp</a>
-    </section>
-
-    <section class="details">
-      <h3>Business Details</h3>
-      <p><strong>Registered Name:</strong> Assista Tech Concepts</p>
-      <p><strong>Address:</strong> 19 Umushi Street Enu-ifite Awka, Anambra State</p>
-      <p><strong>Email:</strong> <a href="mailto:Theassistagroup@gmail.com">Theassistagroup@gmail.com</a></p>
-      <p><strong>Phone:</strong> <a href="tel:+2348133546296">+234 813 354 6296</a></p>
-    </section>
+<!-- HERO -->
+<section id="hero">
+  <p class="hero-eyebrow">AI-Powered Poultry Management</p>
+  <h1 class="hero-title">Smarter Farms,<br>Better Yields</h1>
+  <p class="hero-subtitle">Farma Assista is your conversational AI poultry farm manager — handling inventory, records, data-driven advisory, and health diagnosis through WhatsApp and Telegram.</p>
+  <div class="hero-actions">
+    <a href="#contact" class="btn-primary">Start Managing Smarter</a>
+    <a href="#features" class="btn-outline">See How It Works</a>
   </div>
+  <div class="hero-stats">
+    <div class="stat-item">
+      <div class="stat-number">500+</div>
+      <div class="stat-label">Farms Managed</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number">98%</div>
+      <div class="stat-label">Health Detection Accuracy</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number">24/7</div>
+      <div class="stat-label">AI Availability</div>
+    </div>
+  </div>
+</section>
 
-  <footer>
-    <a href="privacy.html">Privacy Policy</a>
-    <a href="terms.html">Terms of Service</a>
-    <a href="contact.html">Contact Us</a>
-    <p style="margin-top: 1.2rem; font-size: 0.85rem;">
-      © 2026 Assista Tech Concepts. All rights reserved.
-    </p>
-  </footer>
+<!-- ABOUT -->
+<section id="about">
+  <span class="section-eyebrow">Why Farma Assista</span>
+  <div class="about-grid">
+    <div class="about-left">
+      <h2 class="section-title">Built for Serious Poultry Operations</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="num">5+</div>
+          <div class="lbl">Years in Agri-Tech</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">12K+</div>
+          <div class="lbl">Birds Monitored Daily</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">30+</div>
+          <div class="lbl">Disease Patterns Trained</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">15</div>
+          <div class="lbl">Countries Active</div>
+        </div>
+      </div>
+    </div>
+    <div class="about-right">
+      <p>Farma Assista was designed to bridge the gap between traditional poultry farming and modern technology. Our AI-powered platform delivers real-time inventory tracking, automated record management, and intelligent health diagnostics — all accessible through the messaging apps you already use.</p>
+      <p>Whether you manage a small backyard flock or a commercial operation with tens of thousands of birds, Farma Assista adapts to your scale. Farmers report an average 22% reduction in feed waste and a 35% improvement in early disease detection since adopting our system.</p>
+      <p>Our team includes veterinary advisors, data scientists, and poultry industry veterans who understand the challenges of modern bird production. We built Farma Assista because we believe every farmer deserves access to enterprise-grade tools.</p>
+    </div>
+  </div>
+</section>
 
+<!-- GALLERY -->
+<section id="gallery">
+  <div class="gallery-header">
+    <span class="section-eyebrow">Our Impact</span>
+    <h2 class="section-title">Technology in Action</h2>
+    <p class="section-sub" style="margin: 0 auto; text-align:center; color:#5a7080;">See how Farma Assista transforms poultry operations across the globe.</p>
+  </div>
+  <div class="gallery-grid">
+    <img class="gallery-img" src="https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=600&q=80" alt="Poultry flock in pen">
+    <img class="gallery-img" src="https://images.unsplash.com/photo-1612170153139-6f881ff067e0?w=600&q=80" alt="Chickens on farm">
+    <img class="gallery-img" src="https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=600&q=80" alt="Fresh farm eggs">
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section id="services">
+  <div class="services-header">
+    <span class="section-eyebrow">What We Offer</span>
+    <h2 class="section-title">Core Services</h2>
+    <p class="section-sub">Comprehensive AI-powered solutions tailored for poultry farmers at every scale.</p>
+  </div>
+  <div class="services-grid">
+    <div class="service-card">
+      <div class="service-icon">📦</div>
+      <h3>Inventory Management</h3>
+      <p>Track feed, medication, and supply levels in real-time. Receive automated reorder alerts when stock drops below threshold levels.</p>
+      <span class="service-tag">Included in All Plans</span>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">❤️</div>
+      <h3>Health Diagnosis</h3>
+      <p>Describe symptoms to receive instant AI-powered health assessments with treatment recommendations from trained veterinary models.</p>
+      <span class="service-tag">98% Accuracy Rate</span>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">📊</div>
+      <h3>Record Keeping</h3>
+      <p>Maintain complete flock records including mortality rates, egg production, weight gain, and vaccination schedules — all organised automatically.</p>
+      <span class="service-tag">Cloud-Backed & Secure</span>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">💡</div>
+      <h3>Data Advisory</h3>
+      <p>Receive personalised recommendations on feeding schedules, environmental conditions, and flock management based on your historical data patterns.</p>
+      <span class="service-tag">Personalised Insights</span>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">✈️</div>
+      <h3>Telegram Integration</h3>
+      <p>Access all features directly through Telegram. Send commands and receive reports without installing any additional applications.</p>
+      <span class="service-tag">Free to Connect</span>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">💬</div>
+      <h3>WhatsApp Integration</h3>
+      <p>Manage your farm conversations through WhatsApp — the platform you already use daily. Seamless, familiar, and always available.</p>
+      <span class="service-tag">Free to Connect</span>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES LIST -->
+<section id="features">
+  <div class="features-header">
+    <span class="section-eyebrow">Platform Capabilities</span>
+    <h2 class="section-title">Everything You Need</h2>
+    <p class="section-sub" style="margin: 0 auto; text-align:center;">A complete toolkit for modern poultry farm management.</p>
+  </div>
+  <div class="features-list">
+    <div class="feature-row">
+      <span class="feature-name">Feed Inventory Tracking</span>
+      <span class="feature-desc">Automated alerts & reorder suggestions</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Medication & Supply Logs</span>
+      <span class="feature-desc">Expiry notifications & usage history</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Flock Health Monitoring</span>
+      <span class="feature-desc">AI symptom-based disease detection</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Egg Production Analytics</span>
+      <span class="feature-desc">Daily, weekly & monthly trend reports</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Weight Gain Tracking</span>
+      <span class="feature-desc">Growth curve analysis vs. benchmarks</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Vaccination Scheduling</span>
+      <span class="feature-desc">Calendar reminders & compliance logs</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Mortality & Culling Records</span>
+      <span class="feature-desc">Root cause pattern identification</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">FCR & Profitability Reports</span>
+      <span class="feature-desc">Real-time feed conversion & profit summary</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Expert Veterinary Support</span>
+      <span class="feature-desc">Escalation to human specialists</span>
+    </div>
+    <div class="feature-row">
+      <span class="feature-name">Works on WhatsApp & Telegram</span>
+      <span class="feature-desc">No app download required</span>
+    </div>
+  </div>
+</section>
+
+<!-- QUOTE -->
+<section id="quote">
+  <p class="quote-text">"The best time to adopt technology was yesterday. The second best time is today — before your competition does."</p>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="contact-grid">
+    <div class="contact-left">
+      <span class="section-eyebrow">Get in Touch</span>
+      <h2 class="section-title">Let's Transform Your Farm</h2>
+      <p>Ready to bring AI-powered management to your poultry operation? Reach out and our team will guide you through setup.</p>
+      <div class="contact-detail">
+        <span>📞</span>
+        <span>+234 813 354 6296</span>
+      </div>
+      <div class="contact-detail">
+        <span>✉️</span>
+        <span>support@farmassista.com.ng</span>
+      </div>
+      <div class="contact-detail">
+        <span>📍</span>
+        <span>19, Umushi Street Enu-ifite, Isu, Anambra State, Nigeria</span>
+      </div>
+    </div>
+    <div>
+      <form class="contact-form" onsubmit="handleSubmit(event)">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input type="text" id="name" placeholder="Your name" required>
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="your@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" placeholder="How can we help you?" required></textarea>
+        </div>
+        <button type="submit" class="btn-primary" style="align-self: flex-start; padding: 0.75rem 2rem; font-size:0.9rem;">Send Message</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo" style="font-size:1.1rem;">Farma<span style="color:var(--gold)">Assista</span></a>
+      <p>AI-powered poultry farm management accessible through Telegram and WhatsApp. Smarter farms, better yields.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Quick Links</h4>
+      <ul>
+        <li><a href="#about">About Us</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#gallery">Gallery</a></li>
+        <li><a href="#contact">Contact</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Service</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <p>+234 813 354 6296</p>
+      <p>support@farmassista.com.ng</p>
+      <p>19, Umushi Street Enu-ifite, Isu, Anambra State</p>
+    </div>
+    <div class="footer-col">
+      <h4>Availability</h4>
+      <p>Telegram Bot: Available 24/7</p>
+      <p>WhatsApp Bot: Available 24/7</p>
+      <p>Support Team: Mon–Fri, 8am–6pm WAT</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2025 Assista Tech Concepts. All rights reserved.</span>
+    <span>farmassista.com.ng</span>
+  </div>
+</footer>
+
+<script>
+  function handleSubmit(e) {
+    e.preventDefault()
+    const btn = e.target.querySelector('button[type=submit]')
+    btn.textContent = 'Message Sent ✓'
+    btn.style.background = '#2d7d46'
+    setTimeout(() => {
+      btn.textContent = 'Send Message'
+      btn.style.background = ''
+      e.target.reset()
+    }, 3000)
+  }
+
+  // Smooth active nav highlight
+  const sections = document.querySelectorAll('section[id]')
+  const navLinks = document.querySelectorAll('.nav-links a')
+  window.addEventListener('scroll', () => {
+    let current = ''
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 80) current = s.id
+    })
+    navLinks.forEach(a => {
+      a.style.color = a.getAttribute('href') === '#' + current ? '#ffffff' : ''
+    })
+  })
+</script>
 </body>
 </html>
