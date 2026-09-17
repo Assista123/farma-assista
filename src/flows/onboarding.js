@@ -210,8 +210,8 @@ async function handleOnboardingStep(ctx, session) {
     // Send instant Telegram alert to admin
     try {
       const adminChatId = process.env.ADMIN_CHAT_ID
-      if (adminChatId && ctx.telegram) {
-        await ctx.telegram.sendMessage(
+      if (adminChatId) {
+        await ctx.api.sendMessage(
           adminChatId,
           `🚨 *New Farmer Registration!*\n\n` +
           `👤 Name: ${farmer.name}\n` +
@@ -220,6 +220,8 @@ async function handleOnboardingStep(ctx, session) {
           `📞 Phone: ${session.farmer_id}`,
           { parse_mode: 'Markdown' }
         )
+      } else {
+        console.log('Warning: ADMIN_CHAT_ID is not set in .env')
       }
     } catch (adminErr) {
       console.error('Failed to send admin signup notification:', adminErr)
