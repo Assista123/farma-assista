@@ -207,7 +207,26 @@ async function handleOnboardingStep(ctx, session) {
       return
     }
 
+    // Send instant Telegram alert to admin
+    try {
+      const adminChatId = process.env.ADMIN_CHAT_ID
+      if (adminChatId && ctx.telegram) {
+        await ctx.telegram.sendMessage(
+          adminChatId,
+          `🚨 *New Farmer Registration!*\n\n` +
+          `👤 Name: ${farmer.name}\n` +
+          `🏡 Farm: ${farmer.farm_name}\n` +
+          `📍 Location: ${farmer.lga}, ${farmer.state}\n` +
+          `📞 Phone: ${session.farmer_id}`,
+          { parse_mode: 'Markdown' }
+        )
+      }
+    } catch (adminErr) {
+      console.error('Failed to send admin signup notification:', adminErr)
+    }
+
     session.is_registered = true
+    // ... rest of your session cleanup and welcome reply ...
     session.farmer_name = farmer.name
     session.farm_name = farmer.farm_name
     session.farmer_db_id = farmer.id
