@@ -175,14 +175,60 @@ bot.on('message:text', async (ctx) => {
         }))
         await saveSession(farmerId, session)
       } else {
+        // Handle account recovery flow if triggered
+        if (session.current_flow === 'ACCOUNT_RECOVERY') {
+          await handleAccountRecoveryStep(ctx, session)
+          return
+        }
+
+        // Allow user to trigger recovery if they are on a new Telegram account
+        if (input === '🔄 Recover Existing Farm' || input.toLowerCase() === 'recover') {
+          session.current_flow = 'ACCOUNT_RECOVERY'
+          session.current_step = 'ASK_RECOVERY_PHONE'
+          await saveSession(farmerId, session)
+          await ctx.reply(
+            '🔄 *Account Recovery*\n\n' +
+            'Please enter the WhatsApp phone number registered to your previous account:',
+            {
+              parse_mode: 'Markdown',
+              reply_markup: {
+                keyboard: [[{ text: '🏠 Main Menu' }]],
+                resize_keyboard: true
+              }
+            }
+          )
+          return
+        }
+
+        // If they are starting onboarding for the first time, offer the recovery button alongside
         if (session.current_flow === 'ONBOARDING') {
           await handleOnboardingStep(ctx, session)
         } else {
-          await startOnboarding(ctx, session)
+          // Send initial greeting with a recovery option for migrated users
+          session.current_flow = 'ONBOARDING'
+          session.current_step = 'ASK_NAME'
+          session.collected_data = {}
+          await saveSession(farmerId, session)
+
+          await ctx.reply(
+            `Welcome to Farma Assista! 🐔\n\n` +
+            `I am here to help you manage your poultry farm.\n\n` +
+            `If you recently changed your Telegram account and want to link your existing farm, tap **Recover Existing Farm** below.\n\n` +
+            `Otherwise, let's get you set up! What is your name?`,
+            {
+              parse_mode: 'Markdown',
+              reply_markup: {
+                keyboard: [
+                  [{ text: '🔄 Recover Existing Farm' }],
+                  [{ text: '🏠 Main Menu' }]
+                ],
+                resize_keyboard: true
+              }
+            }
+          )
         }
         return
       }
-    }
 
     // Handle undo confirmation first
     if (session.current_flow === 'UNDO_CONFIRM') {

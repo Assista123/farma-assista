@@ -139,6 +139,37 @@ async function handleOnboardingStep(ctx, session) {
     }
 
     session.collected_data.lga = input
+    session.current_step = 'ASK_PHONE'
+    await saveSession(session.farmer_id, session)
+
+    await ctx.reply(
+      `Got it — ${input}.\n\n` +
+      `What is your WhatsApp phone number? (e.g., 08012345678)`,
+      {
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
+    )
+    return
+  }
+
+  if (currentStep === 'ASK_PHONE') {
+    if (input.length < 10) {
+      await ctx.reply(
+        'Please enter a valid phone number (e.g., 08012345678).',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
+      return
+    }
+
+    session.collected_data.phone = input
     session.current_step = 'CONFIRM'
     await saveSession(session.farmer_id, session)
 
@@ -148,7 +179,8 @@ async function handleOnboardingStep(ctx, session) {
       `Almost done! Let me confirm your details:\n\n` +
       `👤 Name: ${data.name}\n` +
       `🏡 Farm: ${data.farm_name}\n` +
-      `📍 Location: ${data.lga}, ${data.state}\n\n` +
+      `📍 Location: ${data.lga}, ${data.state}\n` +
+      `📱 WhatsApp: ${data.phone}\n\n` +
       `Is this correct?`,
       {
         reply_markup: {
@@ -187,7 +219,8 @@ async function handleOnboardingStep(ctx, session) {
 
     const data = session.collected_data
     const farmer = await createFarmer({
-      phone_number: session.farmer_id,
+      phone_number: session.farmer_id, // Telegram ID key
+      contact_phone: data.phone,       // 👈 New WhatsApp/Contact number field
       name: data.name,
       farm_name: data.farm_name,
       state: data.state,
