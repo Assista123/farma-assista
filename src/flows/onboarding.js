@@ -225,20 +225,36 @@ async function handleOnboardingStep(ctx, session) {
       console.error('Failed to send admin signup notification:', adminErr)
     }
 
+    // Clean up session and save farmer details
     session.is_registered = true
-    // ... rest of your session cleanup and welcome reply ...
     session.farmer_name = farmer.name
     session.farm_name = farmer.farm_name
     session.farmer_db_id = farmer.id
+    
+    // Clear the onboarding flow so bot.js can take over the menu buttons
     session.current_flow = null
     session.current_step = null
     session.collected_data = {}
 
     await saveSession(session.farmer_id, session)
 
+    // Send the Navigation Guide
     await ctx.reply(
-      `Welcome to Farma Assista, ${farmer.name}! 🎉\n\n` +
-      `${farmer.farm_name} is now registered.\n\n` +
+      `🎉 Welcome to Farma Assista, ${farmer.name}!\n\n` +
+      `Here is a quick map of how to navigate your new farm assistant:\n\n` +
+      `📋 *Daily Logs*\n` +
+      `Use this to record feed usage, mortality, egg collection, weight, and medications.\n\n` +
+      `💵 *Sales & Finance*\n` +
+      `Record bird/egg sales, farm expenses, and instantly check your Profit Summary.\n\n` +
+      `📦 *Farm Management*\n` +
+      `Run AI ❤️ Health Checks on sick birds, check your stock, view vaccination schedules, or add new flocks.\n\n` +
+      `💡 *Pro Tip:* You can use the menu buttons below, or just chat with me normally (e.g., type "I lost 2 birds today" or "Log 10 crates of eggs").`,
+      { parse_mode: 'Markdown' }
+    )
+
+    // Ask about their first flock
+    await ctx.reply(
+      `${farmer.farm_name} is now registered! 🏡\n\n` +
       `Next, let us add your first flock of birds.\n\n` +
       `Do you have BROILER (meat) birds or LAYER (egg) birds?`,
       {

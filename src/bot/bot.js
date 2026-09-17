@@ -472,7 +472,7 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    if (input === '❤️ Health Check' || input === '❤️ Run Health Check') {
+    if (input === '❤️ Health Check' || input === '❤️ Run Health Check' || input === '🏥 Run Health Check') {
       await startHealthDiagnosis(ctx, session)
       return
     }

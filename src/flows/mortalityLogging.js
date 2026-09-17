@@ -339,6 +339,28 @@ async function saveMortality(ctx, session) {
 
   const suggestion = await suggestNextAction(session, { type: 'MORTALITY', flock: flockForSuggestion })
 
+  // 1. Build a contextual keyboard based on the mortality rate
+  let successKeyboard = {
+    reply_markup: {
+      keyboard: [
+        [{ text: '🏥 Run Health Check' }], // The new shortcut!
+        [{ text: '↩️ Undo last entry' }],
+        [{ text: '🏠 Main Menu' }]
+      ],
+      resize_keyboard: true
+    }
+  }
+
+  // 2. Adjust the alert message for high mortality
+  if (highMortality) {
+    alertMessage =
+      `\n\n🚨 *HIGH MORTALITY ALERT*\n` +
+      `You just lost ${mortalityRate.toFixed(1)}% of your flock.\n` +
+      `Please tap "🏥 Run Health Check" below to check for potential diseases immediately.`
+  } else {
+    alertMessage = `\n\n💡 Would you like to run a health check to figure out why?`
+  }
+
   await ctx.reply(
     `✅ Mortality recorded.\n\n` +
     `📅 Date: ${formatDisplayDate(logDate)}\n` +
@@ -346,12 +368,15 @@ async function saveMortality(ctx, session) {
     `💀 Birds lost: ${data.count}\n` +
     `💰 Estimated loss: ₦${actualLoss.toFixed(0)}` +
     alertMessage +
-    (suggestion || ''),
-    mainMenuKeyboard
+    (suggestion ? `\n\n${suggestion}` : ''),
+    successKeyboard
   )
 
-  // Ask recount prompt after mortality
-  await askRecountPrompt(ctx, session, data.flock_id, data.flock_name, newCount)
+  // NOTE: If there is a high mortality event, we skip the recount prompt so the farmer 
+  // isn't distracted from running the Health Check. 
+  if (!highMortality) {
+    await askRecountPrompt(ctx, session, data.flock_id, data.flock_name, newCount)
+  }
 }
 
 module.exports = {
