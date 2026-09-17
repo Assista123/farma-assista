@@ -149,7 +149,7 @@ bot.on('message:text', async (ctx) => {
 
     session.last_active = new Date().toISOString()
 
-        // Update last message timestamp for 24hr window tracking
+    // Update last message timestamp for 24hr window tracking
     if (session.farmer_db_id) {
       supabase
         .from('farmers')
@@ -158,7 +158,7 @@ bot.on('message:text', async (ctx) => {
         .then(() => {}) // fire and forget — don't block the message handler
     }
 
-    // Is farmer registered?
+    // ── REGISTRATION CHECK ────────────────────────────────────────
     if (!session.is_registered) {
       const existingFarmer = await getFarmerByPhone(farmerId)
 
@@ -200,11 +200,11 @@ bot.on('message:text', async (ctx) => {
           return
         }
 
-        // If they are starting onboarding for the first time, offer the recovery button alongside
+        // If they are continuing onboarding
         if (session.current_flow === 'ONBOARDING') {
           await handleOnboardingStep(ctx, session)
         } else {
-          // Send initial greeting with a recovery option for migrated users
+          // Send initial greeting with recovery option for migrated users
           session.current_flow = 'ONBOARDING'
           session.current_step = 'ASK_NAME'
           session.collected_data = {}
@@ -229,8 +229,9 @@ bot.on('message:text', async (ctx) => {
         }
         return
       }
+    } // ← closes if (!session.is_registered)
 
-    // Handle undo confirmation first
+    // ── UNDO CONFIRMATION ─────────────────────────────────────────
     if (session.current_flow === 'UNDO_CONFIRM') {
       if (input === '✅ Yes, undo it') {
         const undoEntry = await getUndoEntry(farmerId)
@@ -272,7 +273,7 @@ bot.on('message:text', async (ctx) => {
       }
     }
 
-    // Global exit
+    // ── GLOBAL EXIT ───────────────────────────────────────────────
     if (
       input.toLowerCase() === 'cancel' ||
       input.toLowerCase() === 'menu' ||
@@ -288,13 +289,13 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Handle recount if pending
+    // ── RECOUNT ───────────────────────────────────────────────────
     if (isRecountPending(session)) {
       const handled = await handleRecountResponse(ctx, session, input)
       if (handled) return
     }
 
-    // Submenu navigation
+    // ── SUBMENU NAVIGATION ────────────────────────────────────────
     if (input === '📋 Daily Logs') {
       await ctx.reply('What would you like to log?', dailyLogsKeyboard)
       return
@@ -331,7 +332,7 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // ── FLOW ROUTING ─────────────────────────────────────────────
+    // ── FLOW ROUTING ──────────────────────────────────────────────
     if (session.current_flow === 'FLOCK_CREATION') {
       await handleFlockCreationStep(ctx, session)
       return
@@ -411,7 +412,7 @@ bot.on('message:text', async (ctx) => {
       await handleHealthDiagnosisStep(ctx, session)
       return
     }
-    
+
     // ── MENU BUTTON HANDLERS ──────────────────────────────────────
     if (input === '🐔 Broiler' ||
         input === '🐔 Start New Broiler Flock' ||
@@ -523,7 +524,7 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Handle undo
+    // ── UNDO BUTTON ───────────────────────────────────────────────
     if (input === '↩️ Undo last entry') {
       const undoEntry = await getUndoEntry(farmerId)
 
@@ -558,7 +559,7 @@ bot.on('message:text', async (ctx) => {
       return
     }
 
-    // Default — use Gemini intent detection for free text
+    // ── INTENT DETECTION (free text fallback) ─────────────────────
     const intent = await detectIntent(input, session.farmer_name)
     console.log(`Intent detected: ${intent} for message: "${input}"`)
 
@@ -663,7 +664,7 @@ bot.on('message:text', async (ctx) => {
         }
         break
       }
-      
+
       case 'GENERAL_QUESTION': {
         const answer = await generateResponse(
           `The farmer asked: "${input}".\n\n` +
@@ -688,18 +689,19 @@ bot.on('message:text', async (ctx) => {
         }
         break
       }
+
       default:
         await ctx.reply(
           `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
           mainMenuKeyboard
         )
-    }
+    } // ← closes switch(intent)
 
   } catch (err) {
     console.error('Bot error:', err.message)
     await ctx.reply('Sorry, something went wrong. Please try again in a moment.')
   }
-})
+}) // ← closes bot.on('message:text')
 
 bot.catch((err) => {
   console.error('Bot error:', err)

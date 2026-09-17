@@ -250,7 +250,8 @@ async function handleOnboardingStep(ctx, session) {
           `👤 Name: ${farmer.name}\n` +
           `🏡 Farm: ${farmer.farm_name}\n` +
           `📍 Location: ${farmer.lga}, ${farmer.state}\n` +
-          `📞 Phone: ${session.farmer_id}`,
+          `💬 WhatsApp: ${farmer.contact_phone || data.phone}\n` +
+          `🆔 Telegram ID: ${session.farmer_id}`,
           { parse_mode: 'Markdown' }
         )
       } else {
