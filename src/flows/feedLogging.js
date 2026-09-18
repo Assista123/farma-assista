@@ -6,6 +6,8 @@ const { mainMenuKeyboard } = require('../utils/keyboards')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
 const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
+const { checkFeedDeviation } = require('../services/deviationService')
+
 
 async function startFeedLogging(ctx, session) {
   session.current_flow = 'FEED_LOGGING'
@@ -367,14 +369,25 @@ async function saveFeedConsumption(ctx, session) {
 
   const dateLabel = logDate === getToday() ? 'Today' : formatDisplayDate(logDate)
 
+  // ── Check for Feed Deviation / Drop Anomaly ──
+  const deviation = await checkFeedDeviation(data.flock_id, data.quantity_kg, logDate)
+  let anomalyWarning = ''
+  if (deviation) {
+    anomalyWarning = 
+      `\n\n🚨 *ANOMALY ALERT: Feed Intake Drop*\n` +
+      `Today's consumption (${deviation.current}kg) is *${deviation.dropPercent}% lower* than your 7-day average (~${deviation.avg}kg).\n` +
+      `⚠️ Sudden drops in feed intake are often an early sign of stress, water line blockage, or disease outbreak. Consider running a health check!`
+  }
+
   await ctx.reply(
     '✅ Feed consumption recorded!\n\n' +
     `📅 Date: ${dateLabel}\n` +
     `🌾 ${data.quantity_kg}kg ${data.feed_type}\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
     stockMessage +
+    anomalyWarning + // 👈 Added here so it prints out to the user!
     (suggestion || ''),
-    mainMenuKeyboard
+    { parse_mode: 'Markdown', ...mainMenuKeyboard } // 👈 Added parse_mode to render the markdown stars/bolding correctly
   )
 }
 
