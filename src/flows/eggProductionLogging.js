@@ -5,6 +5,7 @@ const { saveSession } = require('../utils/sessionManager')
 const { mapToOption, mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
 const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
+const { checkEggDeviation } = require('../services/deviationService')
 
 async function startEggProductionLogging(ctx, session) {
   const layerFlocks = session.active_flocks.filter(f => f.type === 'LAYER')
@@ -395,10 +396,8 @@ async function showConfirmation(ctx, session) {
 async function saveEggProduction(ctx, session) {
   const data = session.collected_data
   const logDate = data.log_date || getToday()
-
   const flock = await getFlockById(data.flock_id)
   const birdAgeDays = getBirdAgeDays(flock.start_date, logDate)
-
   const log = await logEggProduction({
     flock_id: data.flock_id,
     date: logDate,
@@ -410,22 +409,18 @@ async function saveEggProduction(ctx, session) {
     egg_weight_3_g: data.egg_weight_3_g,
     egg_size_concern: data.egg_size_concern
   })
-
   if (!log) {
     await ctx.reply('Sorry, something went wrong. Please try again.')
     return
   }
-
   await saveUndoEntry(session.farmer_id, {
     type: 'EGG_PRODUCTION',
     record_id: log.id,
     table: 'egg_production_logs',
     description: `${data.eggs_collected} eggs logged for ${data.flock_name}`
   })
-
   // Calculate lay rate
   const layRate = await getLayRate(data.flock_id, flock.current_bird_count)
-
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -460,8 +455,17 @@ async function saveEggProduction(ctx, session) {
     }
   }
 
-  const suggestion = await suggestNextAction(session, { type: 'EGG_PRODUCTION', flock })
+  // ── Check for Egg Production Deviation / Drop Anomaly ──
+  const eggDeviation = await checkEggDeviation(data.flock_id, data.eggs_collected, logDate)
+  let eggAnomalyWarning = ''
+  if (eggDeviation) {
+    eggAnomalyWarning = 
+      `\n\n🚨 *ANOMALY ALERT: Egg Production Drop*\n` +
+      `Today's collection (${eggDeviation.current} eggs) is *${eggDeviation.dropPercent}% lower* than your 7-day average (~${eggDeviation.avg} eggs).\n` +
+      `⚠️ Sharp production drops can indicate heat stress, feed quality issues, or disease outbreak. Consider running a health check!`
+  }
 
+  const suggestion = await suggestNextAction(session, { type: 'EGG_PRODUCTION', flock })
   await ctx.reply(
     `✅ Egg production recorded!\n\n` +
     `📅 Date: ${formatDisplayDate(logDate)}\n` +
@@ -472,8 +476,10 @@ async function saveEggProduction(ctx, session) {
     performanceMessage +
     sizeWarning +
     brokenWarning +
+    eggAnomalyWarning +
     (suggestion || ''),
     {
+      parse_mode: 'Markdown',
       reply_markup: {
         keyboard: [
           [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
