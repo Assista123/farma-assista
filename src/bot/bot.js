@@ -135,6 +135,14 @@ const farmManagementKeyboard = {
   }
 }
 
+const {
+  startOnboarding,
+  handleOnboardingStep
+} = require('../flows/onboarding')
+const {
+  handleAccountRecoveryStep
+} = require('../flows/accountRecovery') // 👈 Add this import
+
 // ── VACCINATION QUICK-RESOLVE CALLBACK HANDLER (GRAMMY) ────────────────
 bot.callbackQuery(/^vax_done_(.+)$/, async (ctx) => {
   try {
