@@ -455,14 +455,21 @@ async function saveEggProduction(ctx, session) {
     }
   }
 
-  // ── Check for Egg Production Deviation / Drop Anomaly ──
-  const eggDeviation = await checkEggDeviation(data.flock_id, data.eggs_collected, logDate)
+    // ── Check for Egg Production Deviation / Drop Anomaly ──
+  const eggDeviation = await checkEggDeviation(data.flock_id, data.eggs_collected, log.id)
   let eggAnomalyWarning = ''
   if (eggDeviation) {
-    eggAnomalyWarning = 
-      `\n\n🚨 *ANOMALY ALERT: Egg Production Drop*\n` +
-      `Today's collection (${eggDeviation.current} eggs) is *${eggDeviation.dropPercent}% lower* than your 7-day average (~${eggDeviation.avg} eggs).\n` +
-      `⚠️ Sharp production drops can indicate heat stress, feed quality issues, or disease outbreak. Consider running a health check!`
+    if (eggDeviation.type === 'EGG_DROP') {
+      eggAnomalyWarning =
+        `\n\n🚨 *ANOMALY ALERT: Egg Production Drop*\n` +
+        `Today's collection (${eggDeviation.current} eggs) is *${eggDeviation.dropPercent}% lower* than your 7-day average (~${eggDeviation.avg} eggs).\n` +
+        `⚠️ Sharp drops can indicate heat stress, feed quality issues, or disease. Consider running a health check.`
+    } else if (eggDeviation.type === 'EGG_SPIKE') {
+      eggAnomalyWarning =
+        `\n\n⚠️ *ANOMALY ALERT: Unusual Egg Spike*\n` +
+        `Today's collection (${eggDeviation.current} eggs) is *${eggDeviation.spikePercent}% higher* than your 7-day average (~${eggDeviation.avg} eggs).\n` +
+        `This may indicate a missed collection day. Please double-check.`
+    }
   }
 
   const suggestion = await suggestNextAction(session, { type: 'EGG_PRODUCTION', flock })
