@@ -344,6 +344,25 @@ async function saveFeedConsumption(ctx, session) {
     flock: flock ? { type: flock.type, start_date: flock.start_date } : null
   })
 
+  // ── Check for Feed Deviation / Drop Anomaly ──
+  // Pass consumption.id so the service excludes the record we just saved
+  const deviation = await checkFeedDeviation(data.flock_id, data.quantity_kg, consumption.id)
+
+  let anomalyWarning = ''
+  if (deviation) {
+    if (deviation.type === 'FEED_DROP') {
+      anomalyWarning =
+        `\n\n🚨 *ANOMALY ALERT: Feed Intake Drop*\n` +
+        `Today's consumption (${deviation.current}kg) is *${deviation.dropPercent}% lower* than your 7-day average (~${deviation.avg}kg).\n` +
+        `⚠️ Sudden drops in feed intake are often an early sign of stress, water line blockage, or disease. Consider running a health check.`
+    } else if (deviation.type === 'FEED_SPIKE') {
+      anomalyWarning =
+        `\n\n⚠️ *ANOMALY ALERT: Unusual Feed Spike*\n` +
+        `Today's consumption (${deviation.current}kg) is *${deviation.spikePercent}% higher* than your 7-day average (~${deviation.avg}kg).\n` +
+        `Please double-check this entry is correct.`
+    }
+  }
+
   session.current_flow = null
   session.current_step = null
   session.collected_data = {}
@@ -369,34 +388,17 @@ async function saveFeedConsumption(ctx, session) {
 
   const dateLabel = logDate === getToday() ? 'Today' : formatDisplayDate(logDate)
 
-  // ── Check for Feed Deviation / Drop Anomaly ──
-  const deviation = await checkFeedDeviation(data.flock_id, data.quantity_kg, consumption.id)
-  let anomalyWarning = ''
-if (deviation) {
-  if (deviation.type === 'FEED_DROP') {
-    anomalyWarning =
-      `\n\n🚨 *ANOMALY ALERT: Feed Intake Drop*\n` +
-      `Today's consumption (${deviation.current}kg) is *${deviation.dropPercent}% lower* than your 7-day average (~${deviation.avg}kg).\n` +
-      `⚠️ Sudden drops in feed intake are often an early sign of stress, water line blockage, or disease. Consider running a health check.`
-  } else if (deviation.type === 'FEED_SPIKE') {
-    anomalyWarning =
-      `\n\n⚠️ *ANOMALY ALERT: Unusual Feed Spike*\n` +
-      `Today's consumption (${deviation.current}kg) is *${deviation.spikePercent}% higher* than your 7-day average (~${deviation.avg}kg).\n` +
-      `Please double-check this entry is correct.`
-  }
-}
-
   await ctx.reply(
     '✅ Feed consumption recorded!\n\n' +
     `📅 Date: ${dateLabel}\n` +
     `🌾 ${data.quantity_kg}kg ${data.feed_type}\n` +
     `🐔 Flock: ${data.flock_name}\n\n` +
     stockMessage +
-    anomalyWarning + // 👈 Added here so it prints out to the user!
+    anomalyWarning +
     (suggestion || ''),
-    { parse_mode: 'Markdown', ...mainMenuKeyboard } // 👈 Added parse_mode to render the markdown stars/bolding correctly
+    { parse_mode: 'Markdown', ...mainMenuKeyboard }
   )
-
+}
 
 async function showFeedStock(ctx, session) {
   if (session.active_flocks.length === 0) {
