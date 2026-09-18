@@ -136,10 +136,6 @@ const farmManagementKeyboard = {
 }
 
 const {
-  startOnboarding,
-  handleOnboardingStep
-} = require('../flows/onboarding')
-const {
   handleAccountRecoveryStep
 } = require('../flows/accountRecovery') // 👈 Add this import
 
