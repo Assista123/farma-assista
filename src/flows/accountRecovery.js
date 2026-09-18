@@ -63,16 +63,35 @@ async function handleAccountRecoveryStep(ctx, session) {
       return
     }
 
-    // Search Supabase for a farmer with this contact_phone
+    // Search Supabase using the existing phone_number column
     const { data: farmer, error } = await supabase
       .from('farmers')
       .select('*')
-      .eq('contact_phone', input)
+      .eq('phone_number', input)
       .maybeSingle()
 
     if (error) {
       console.error('Database lookup error:', error.message)
       await ctx.reply('Sorry, something went wrong checking your account. Please try again.')
+      return
+    }
+
+    if (!farmer) {
+      await ctx.reply(
+        '❌ *Account Not Found*\n\n' +
+        `We could not find any farm registered with the number **${input}**.\n\n` +
+        'Please check the number or start a new registration.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [
+              [{ text: '🔄 Try Again' }, { text: '✨ Start New Registration' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
