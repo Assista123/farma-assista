@@ -160,8 +160,30 @@ bot.on('message:text', async (ctx) => {
 
     // ── REGISTRATION CHECK ────────────────────────────────────────
     if (!session.is_registered) {
-      const existingFarmer = await getFarmerByPhone(farmerId)
+      // 0. Intercept escape buttons during onboarding or recovery!
+      if (input === '🏠 Main Menu' || input.toLowerCase() === 'cancel' || input.toLowerCase() === 'start over') {
+        session.current_flow = 'ONBOARDING'
+        session.current_step = 'ASK_NAME'
+        session.collected_data = {}
+        await saveSession(farmerId, session)
+        await ctx.reply(
+          `Welcome to Farma Assista! 🐔\n\n` +
+          `I am here to help you manage your poultry farm.\n\n` +
+          `If you recently changed your Telegram account and want to link your existing farm, tap **Recover Existing Farm** below.\n\n` +
+          `Otherwise, let's get you set up! What is your name?`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              keyboard: [[{ text: '🔄 Recover Existing Farm' }], [{ text: '🏠 Main Menu' }]],
+              resize_keyboard: true
+            }
+          }
+        )
+        return
+      }
 
+      const existingFarmer = await getFarmerByPhone(farmerId)
+      
       if (existingFarmer) {
         const flocks = await getActiveFlocks(existingFarmer.id)
         session.is_registered = true
