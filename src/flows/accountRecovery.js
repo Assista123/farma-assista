@@ -32,7 +32,8 @@ async function handleAccountRecoveryStep(ctx, session) {
     await saveSession(farmerId, session)
     await ctx.reply(
       '🔄 *Account Recovery*\n\n' +
-      'Please enter the correct WhatsApp phone number registered to your previous account:',
+      'Please enter the WhatsApp phone number registered to your previous account.\n\n' +
+      '📱 *Format:* 11 digits starting with 0 (e.g., 08012345678 or +2348012345678)',
       {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -67,13 +68,19 @@ async function handleAccountRecoveryStep(ctx, session) {
       .from('farmers')
       .select('*')
       .eq('contact_phone', input)
-      .single()
+      .maybeSingle()
 
-    if (error || !farmer) {
+    if (error) {
+      console.error('Database lookup error:', error.message)
+      await ctx.reply('Sorry, something went wrong checking your account. Please try again.')
+      return
+    }
+
+    if (!farmer) {
       await ctx.reply(
-        '❌ *No Farm Found*\n\n' +
-        `We couldn't find an existing farm registered with **${input}**.\n\n` +
-        'What would you like to do?',
+        '❌ *Account Not Found*\n\n' +
+        `We could not find any farm registered with the number **${input}**.\n\n` +
+        'Please check the number or start a new registration.',
         {
           parse_mode: 'Markdown',
           reply_markup: {
