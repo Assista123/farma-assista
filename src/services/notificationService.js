@@ -217,7 +217,14 @@ async function checkAlerts(farmer, bot) {
           `How to give it: ${schedule.plain_instructions}\n\n` +
           `Importance: ${schedule.importance}`
 
-        await bot.api.sendMessage(farmer.phone_number, message)
+        // 👈 Attach inline quick-resolve button
+        await bot.api.sendMessage(farmer.phone_number, message, {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '✅ Mark Done', callback_data: `vax_done_${vacc.id}` }]
+            ]
+          }
+        })
         await logNotification(farmer.id, 'ALERT', 'VACCINATION_REMINDER', message)
       }
     }

@@ -19,7 +19,7 @@ async function startOnboarding(ctx, session) {
     {
       reply_markup: {
         keyboard: [
-          [{ text: '🔄 Recover Existing Farm' }], // 👈 Keeps the button visible
+          [{ text: '🔄 Recover Existing Farm' }],
           [{ text: '🏠 Main Menu' }]
         ],
         resize_keyboard: true
@@ -32,10 +32,17 @@ async function handleOnboardingStep(ctx, session) {
   const input = ctx.message.text.trim()
   const currentStep = session.current_step
 
+  // ── Global Escape / Main Menu Interceptor ──
+  if (input === '🏠 Main Menu' || input.toLowerCase() === 'cancel' || input.toLowerCase() === 'start over') {
+    await startOnboarding(ctx, session)
+    return
+  }
+
   if (currentStep === 'ASK_NAME') {
-    if (input.length < 2) {
+    // Validate name: At least 2 chars, not just numbers/symbols
+    if (input.length < 2 || /^\d+$/.test(input)) {
       await ctx.reply(
-        'Please enter your full name.',
+        'Please enter a valid full name (letters only).',
         {
           reply_markup: {
             keyboard: [
@@ -70,7 +77,7 @@ async function handleOnboardingStep(ctx, session) {
   if (currentStep === 'ASK_FARM_NAME') {
     if (input.length < 2) {
       await ctx.reply(
-        'Please enter a name for your farm.',
+        'Please enter a valid name for your farm (at least 2 characters).',
         {
           reply_markup: {
             keyboard: [[{ text: '🏠 Main Menu' }]],
@@ -100,9 +107,9 @@ async function handleOnboardingStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_STATE') {
-    if (input.length < 2) {
+    if (input.length < 2 || /^\d+$/.test(input)) {
       await ctx.reply(
-        'Please enter your state.',
+        'Please enter a valid state name.',
         {
           reply_markup: {
             keyboard: [[{ text: '🏠 Main Menu' }]],
@@ -131,9 +138,9 @@ async function handleOnboardingStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_LGA') {
-    if (input.length < 2) {
+    if (input.length < 2 || /^\d+$/.test(input)) {
       await ctx.reply(
-        'Please enter your LGA.',
+        'Please enter a valid LGA name.',
         {
           reply_markup: {
             keyboard: [[{ text: '🏠 Main Menu' }]],
@@ -162,9 +169,13 @@ async function handleOnboardingStep(ctx, session) {
   }
 
   if (currentStep === 'ASK_PHONE') {
-    if (input.length < 10) {
+    // Strict Nigerian phone regex check: starts with 0 or +234 followed by 7, 8, 9 and 9 digits
+    const phoneRegex = /^(\+?234|0)[789]\d{9}$/
+    
+    if (!phoneRegex.test(input)) {
       await ctx.reply(
-        'Please enter a valid phone number (e.g., 08012345678).',
+        '⚠️ That does not look like a valid phone number.\n\n' +
+        'Please enter a valid 11-digit WhatsApp phone number (e.g., 08012345678).',
         {
           reply_markup: {
             keyboard: [[{ text: '🏠 Main Menu' }]],
@@ -226,7 +237,7 @@ async function handleOnboardingStep(ctx, session) {
     const data = session.collected_data
     const farmer = await createFarmer({
       phone_number: session.farmer_id, // Telegram ID key
-      contact_phone: data.phone,       // 👈 New WhatsApp/Contact number field
+      contact_phone: data.phone,       // WhatsApp/Contact number field
       name: data.name,
       farm_name: data.farm_name,
       state: data.state,
@@ -273,14 +284,13 @@ async function handleOnboardingStep(ctx, session) {
     session.farm_name = farmer.farm_name
     session.farmer_db_id = farmer.id
     
-    // Clear the onboarding flow so bot.js can take over the menu buttons
     session.current_flow = null
     session.current_step = null
     session.collected_data = {}
 
     await saveSession(session.farmer_id, session)
 
-    // Send the Navigation Guide
+    // Send Navigation Guide
     await ctx.reply(
       `🎉 Welcome to Farma Assista, ${farmer.name}!\n\n` +
       `Here is a quick map of how to navigate your new farm assistant:\n\n` +
@@ -290,7 +300,7 @@ async function handleOnboardingStep(ctx, session) {
       `Record bird/egg sales, farm expenses, and instantly check your Profit Summary.\n\n` +
       `📦 *Farm Management*\n` +
       `Run AI ❤️ Health Checks on sick birds, check your stock, view vaccination schedules, or add new flocks.\n\n` +
-      `💡 *Pro Tip:* You can use the menu buttons below, or just chat with me normally (e.g., type "I lost 2 birds today" or "Log 10 crates of eggs").`,
+      `💡 *Pro Tip:* You can use the menu buttons below, or just chat with me normally.`,
       { parse_mode: 'Markdown' }
     )
 

@@ -69,6 +69,7 @@ const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
 const { getUndoEntry, clearUndoEntry } = require('../utils/undoManager')
 const { deleteRecord } = require('../services/undoService')
+const { markAdministered } = require('../services/vaccinationService')
 const supabase = require('../config/database')
 const {
   handleRecountResponse,
@@ -134,6 +135,25 @@ const farmManagementKeyboard = {
   }
 }
 
+// ── VACCINATION QUICK-RESOLVE CALLBACK HANDLER (GRAMMY) ────────────────
+bot.callbackQuery(/^vax_done_(.+)$/, async (ctx) => {
+  try {
+    const vaccinationLogId = ctx.match[1]
+    const updated = await markAdministered(vaccinationLogId)
+
+    if (updated) {
+      await ctx.answerCallbackQuery({ text: 'Vaccination marked as done! ✅' })
+      await ctx.editMessageText(ctx.callbackQuery.message.text + '\n\n*Status: Administered ✅*', {
+        parse_mode: 'Markdown'
+      })
+    } else {
+      await ctx.answerCallbackQuery({ text: 'Could not update. It may already be marked done.', show_alert: true })
+    }
+  } catch (err) {
+    console.error('Error handling vax_done callback:', err.message)
+    await ctx.answerCallbackQuery({ text: 'An error occurred.', show_alert: true })
+  }
+})
 
 bot.on('message:text', async (ctx) => {
   const farmerId = ctx.from.id.toString()
