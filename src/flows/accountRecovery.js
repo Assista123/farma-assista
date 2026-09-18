@@ -32,8 +32,8 @@ async function handleAccountRecoveryStep(ctx, session) {
     await saveSession(farmerId, session)
     await ctx.reply(
       '🔄 *Account Recovery*\n\n' +
-      'Please enter the WhatsApp phone number registered to your previous account.\n\n' +
-      '📱 *Format:* 11 digits starting with 0 (e.g., 08012345678 or +2348012345678)',
+      'Please enter the correct WhatsApp phone number registered to your previous account:\n\n' +
+      '📱 *Format:* 11 digits starting with 0 (e.g., 08012345678)',
       {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -63,16 +63,27 @@ async function handleAccountRecoveryStep(ctx, session) {
       return
     }
 
-    // Search Supabase using the contact_phone column
+    // Search Supabase for a farmer matching this phone number
     const { data: farmer, error } = await supabase
       .from('farmers')
       .select('*')
-      .eq('contact_phone', input)
+      .eq('phone_number', input)
       .maybeSingle()
 
     if (error) {
-      console.error('Database lookup error:', error.message)
-      await ctx.reply('Sorry, something went wrong checking your account. Please try again.')
+      console.error('Database recovery lookup error:', error.message)
+      await ctx.reply(
+        'Sorry, something went wrong checking your account. Please try again or tap Main Menu.',
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: '🔄 Try Again' }, { text: '✨ Start New Registration' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -95,19 +106,22 @@ async function handleAccountRecoveryStep(ctx, session) {
       return
     }
 
-    // Update their record in Supabase so their new Telegram ID becomes their new phone_number key
+    // Update their record in Supabase so their new Telegram ID replaces their old phone_number key
     const { error: updateErr } = await supabase
       .from('farmers')
       .update({ phone_number: farmerId })
       .eq('id', farmer.id)
 
     if (updateErr) {
-      console.error('Account linking error:', updateErr.message)
+      console.error('Database update error during recovery:', updateErr.message)
       await ctx.reply(
-        'Sorry, something went wrong linking your account. Please try again or tap Main Menu.',
+        'Sorry, something went wrong linking your account to this Telegram profile. Please try again.',
         {
           reply_markup: {
-            keyboard: [[{ text: '🏠 Main Menu' }]],
+            keyboard: [
+              [{ text: '🔄 Try Again' }, { text: '✨ Start New Registration' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
             resize_keyboard: true
           }
         }
