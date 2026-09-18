@@ -1,11 +1,64 @@
-// Inside a recovery handler (e.g. src/flows/accountRecovery.js)
+const supabase = require('../config/database')
+const { saveSession } = require('../utils/sessionManager')
+const { getActiveFlocks } = require('../services/flockService')
+const { startOnboarding } = require('./onboarding')
+
+const mainMenuKeyboard = {
+  reply_markup: {
+    keyboard: [
+      [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
+      [{ text: '📦 Farm Management' }, { text: '🏠 Main Menu' }]
+    ],
+    resize_keyboard: true
+  }
+}
+
 async function handleAccountRecoveryStep(ctx, session) {
   const input = ctx.message.text.trim()
   const farmerId = session.farmer_id
 
+  // Global Escape Interceptor
+  if (input === '🏠 Main Menu' || input.toLowerCase() === 'cancel' || input.toLowerCase() === 'start over' || input === '✨ Start New Registration') {
+    session.current_flow = null
+    session.current_step = null
+    session.collected_data = {}
+    await saveSession(farmerId, session)
+    await startOnboarding(ctx, session)
+    return
+  }
+
+  if (input === '🔄 Try Again') {
+    session.current_step = 'ASK_RECOVERY_PHONE'
+    await saveSession(farmerId, session)
+    await ctx.reply(
+      '🔄 *Account Recovery*\n\n' +
+      'Please enter the correct WhatsApp phone number registered to your previous account:',
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          keyboard: [[{ text: '🏠 Main Menu' }]],
+          resize_keyboard: true
+        }
+      }
+    )
+    return
+  }
+
   if (session.current_step === 'ASK_RECOVERY_PHONE') {
-    if (input.length < 10) {
-      await ctx.reply('Please enter a valid WhatsApp phone number.')
+    // Strict Nigerian phone validation regex
+    const phoneRegex = /^(\+?234|0)[789]\d{9}$/
+
+    if (!phoneRegex.test(input)) {
+      await ctx.reply(
+        '⚠️ That does not look like a valid phone number format.\n\n' +
+        'Please enter a valid 11-digit WhatsApp phone number (e.g., 08012345678), or tap Main Menu to exit.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -18,21 +71,39 @@ async function handleAccountRecoveryStep(ctx, session) {
 
     if (error || !farmer) {
       await ctx.reply(
-        '❌ No farm found with that WhatsApp number.\n\n' +
-        'Please check the number and try again, or type "cancel" to start fresh onboarding.',
-        { reply_markup: { keyboard: [[{ text: '🏠 Main Menu' }]], resize_keyboard: true } }
+        '❌ *No Farm Found*\n\n' +
+        `We couldn't find an existing farm registered with **${input}**.\n\n` +
+        'What would you like to do?',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [
+              [{ text: '🔄 Try Again' }, { text: '✨ Start New Registration' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
+            resize_keyboard: true
+          }
+        }
       )
       return
     }
 
-    // Update their record in Supabase so their new Telegram ID becomes their new phone_number key!
+    // Update their record in Supabase so their new Telegram ID becomes their new phone_number key
     const { error: updateErr } = await supabase
       .from('farmers')
       .update({ phone_number: farmerId })
       .eq('id', farmer.id)
 
     if (updateErr) {
-      await ctx.reply('Sorry, something went wrong linking your account. Please try again.')
+      await ctx.reply(
+        'Sorry, something went wrong linking your account. Please try again or tap Main Menu.',
+        {
+          reply_markup: {
+            keyboard: [[{ text: '🏠 Main Menu' }]],
+            resize_keyboard: true
+          }
+        }
+      )
       return
     }
 
@@ -58,4 +129,8 @@ async function handleAccountRecoveryStep(ctx, session) {
       { parse_mode: 'Markdown', reply_markup: mainMenuKeyboard }
     )
   }
+}
+
+module.exports = {
+  handleAccountRecoveryStep
 }
