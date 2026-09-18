@@ -18,7 +18,10 @@ async function startOnboarding(ctx, session) {
     `What is your name?`,
     {
       reply_markup: {
-        keyboard: [[{ text: '🏠 Main Menu' }]],
+        keyboard: [
+          [{ text: '🔄 Recover Existing Farm' }], // 👈 Keeps the button visible
+          [{ text: '🏠 Main Menu' }]
+        ],
         resize_keyboard: true
       }
     }
@@ -35,7 +38,10 @@ async function handleOnboardingStep(ctx, session) {
         'Please enter your full name.',
         {
           reply_markup: {
-            keyboard: [[{ text: '🏠 Main Menu' }]],
+            keyboard: [
+              [{ text: '🔄 Recover Existing Farm' }],
+              [{ text: '🏠 Main Menu' }]
+            ],
             resize_keyboard: true
           }
         }

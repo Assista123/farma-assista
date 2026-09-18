@@ -175,16 +175,17 @@ bot.on('message:text', async (ctx) => {
         }))
         await saveSession(farmerId, session)
       } else {
-        // Handle account recovery flow if triggered
+        // 1. Handle account recovery flow steps first if already active
         if (session.current_flow === 'ACCOUNT_RECOVERY') {
           await handleAccountRecoveryStep(ctx, session)
           return
         }
 
-        // Allow user to trigger recovery if they are on a new Telegram account
+        // 2. Allow user to trigger recovery from anywhere via button or text
         if (input === '🔄 Recover Existing Farm' || input.toLowerCase() === 'recover') {
           session.current_flow = 'ACCOUNT_RECOVERY'
           session.current_step = 'ASK_RECOVERY_PHONE'
+          session.collected_data = {}
           await saveSession(farmerId, session)
           await ctx.reply(
             '🔄 *Account Recovery*\n\n' +
@@ -200,11 +201,10 @@ bot.on('message:text', async (ctx) => {
           return
         }
 
-        // If they are continuing onboarding
+        // 3. Otherwise continue normal onboarding
         if (session.current_flow === 'ONBOARDING') {
           await handleOnboardingStep(ctx, session)
         } else {
-          // Send initial greeting with recovery option for migrated users
           session.current_flow = 'ONBOARDING'
           session.current_step = 'ASK_NAME'
           session.collected_data = {}
@@ -695,13 +695,13 @@ bot.on('message:text', async (ctx) => {
           `Hello ${session.farmer_name}! 👋\n\nWhat would you like to do today?`,
           mainMenuKeyboard
         )
-    } // ← closes switch(intent)
+    }
 
   } catch (err) {
     console.error('Bot error:', err.message)
     await ctx.reply('Sorry, something went wrong. Please try again in a moment.')
   }
-}) // ← closes bot.on('message:text')
+})
 
 bot.catch((err) => {
   console.error('Bot error:', err)
