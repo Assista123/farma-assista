@@ -247,12 +247,17 @@ async function displaySchedule(ctx, session, flockId) {
           ? '🟡 Due soon'
           : '📅 Upcoming'
 
+    const flockTarget = schedule.flock_type && schedule.flock_type !== 'BOTH'
+      ? ` (${schedule.flock_type === 'BROILER' ? '🐔 Broilers only' : '🥚 Layers only'})`
+      : ''
+
     message +=
       `${urgency}\n` +
-      `💉 ${schedule.vaccine_name}\n` +
+      `💉 ${schedule.vaccine_name}${flockTarget}\n` +
       `📅 Due: ${vacc.scheduled_date}\n` +
-      `💊 How: ${schedule.administration_method.replace('_', ' ')}\n` +
-      `⭐ ${schedule.importance}\n\n`
+      `💊 How: ${schedule.administration_method.replace(/_/g, ' ')}\n` +
+      `⭐ ${schedule.importance}\n` +
+      `⚠️ Withdrawal: Vaccines usually have no meat/egg withdrawal. If antibiotics are used with it, wait at least 2 weeks before slaughter or selling eggs. Always confirm with your vet.\n\n`
   }
 
   await saveSession(session.farmer_id, session)

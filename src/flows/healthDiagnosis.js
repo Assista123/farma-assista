@@ -401,13 +401,14 @@ async function runDiagnosis(ctx, session) {
       topMatch.condition.recommended_drugs.length > 0
     ) {
       if (topMatch.condition.no_drug_note) {
-        drugText = `\n\n💊 Treatment:\n${topMatch.condition.no_drug_note}`
+        drugText = `\n\n💊 Treatment guidance:\n${topMatch.condition.no_drug_note}`
       } else {
-        drugText = `\n\n💊 Recommended treatment:`
+        drugText = `\n\n💊 Suggested treatment class:`
         for (const drug of topMatch.condition.recommended_drugs) {
           drugText += `\n• ${drug.name}: ${drug.dosage}`
         }
       }
+      drugText += `\n\n⚕️ Always consult your veterinary doctor before administering any medication. Drug dosages should be confirmed by a licensed veterinarian.`
     }
 
     // Prevention note
@@ -448,6 +449,7 @@ async function runDiagnosis(ctx, session) {
       await ctx.reply(
         fullMessage +
         `\n\n🩺 We strongly recommend a vet consultation for this condition.\n\n` +
+        `⚕️ Always consult your veterinary doctor before administering any medication.\n\n` +
         `Would you like us to connect you to a vet?`,
         {
           reply_markup: {
@@ -461,7 +463,10 @@ async function runDiagnosis(ctx, session) {
         }
       )
     } else {
-      await ctx.reply(fullMessage, mainMenuKeyboard)
+        await ctx.reply(
+        fullMessage + `\n\n⚕️ Always consult your veterinary doctor before administering any medication.`,
+        mainMenuKeyboard
+      )
     }
 
   } catch (err) {

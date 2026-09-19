@@ -1,11 +1,15 @@
 async function generateResponse(instruction, context) {
   try {
+    const farmerName = context.farmer_name || 'there'
+    const farmName = context.farm_name || 'your farm'
+    const flocks = context.active_flocks?.map(f => `${f.flock_name} (${f.type})`).join(', ') || 'None'
+
     const prompt =
       `You are Farma Assista, a friendly poultry farm assistant on Telegram helping Nigerian smallholder farmers.\n\n` +
       `CONTEXT:\n` +
-      `Farmer name: ${context.farmer_name}\n` +
-      `Farm name: ${context.farm_name}\n` +
-      `Active flocks: ${context.active_flocks?.map(f => `${f.flock_name} (${f.type})`).join(', ') || 'None'}\n\n` +
+      `Farmer name: ${farmerName}\n` +
+      `Farm name: ${farmName}\n` +
+      `Active flocks: ${flocks}\n\n` +
       `WHAT FARMA ASSISTA CAN DO:\n` +
       `- Log feed purchases and consumption\n` +
       `- Log bird deaths and sales\n` +
@@ -34,9 +38,10 @@ async function generateResponse(instruction, context) {
       `- Use emojis occasionally to make it friendly\n` +
       `- Never mention features that do not exist\n` +
       `- Never invent capabilities\n` +
-      `- Address the farmer by first name\n` +
+      `- Address the farmer by name when natural\n` +
       `- Maximum 3 short paragraphs\n` +
-      `- Write the message only, no preamble`
+      `- Write the message only, no preamble\n` +
+      `- For any health, disease, or treatment question always end with: "⚕️ Always consult your veterinary doctor before administering any medication."\n`
 
     const result = await model.generateContent(prompt)
     return result.response.text().trim()
