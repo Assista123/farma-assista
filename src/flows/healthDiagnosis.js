@@ -3,6 +3,7 @@ const { saveDiagnosisLog, getAllConditions } = require('../services/healthServic
 const { getFlockById, getBirdAgeDays, getAgeCategory } = require('../services/flockService')
 const supabase = require('../config/database')
 const { mapToOption } = require('../utils/optionMapper')
+const { mainMenuKeyboard } = require('../utils/keyboards')
 
 // All symptoms with plain language labels
 const SYMPTOMS = [
