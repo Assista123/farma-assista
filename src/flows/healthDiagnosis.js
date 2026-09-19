@@ -28,7 +28,7 @@ const DROPPING_COLORS = [
   { label: '🟤 Normal brown', value: 'BROWN' },
   { label: '🟡 Yellow or mustard', value: 'YELLOW' },
   { label: '🔴 Bloody or dark red', value: 'BLOODY' },
-  { label: '⚪ Looks normal', value: 'NORMAL' }
+  { label: '⚪ Looks normal', value: 'BROWN' }   // ← changed from NORMAL
 ]
 
 const DROPPING_TEXTURES = [
