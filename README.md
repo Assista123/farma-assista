@@ -1,9 +1,10 @@
+
 # Farma Assista
 
 AI conversational farm manager for poultry farmers.  
 Live on **Telegram** and **WhatsApp**.
 
-Farmers can log feed, mortality, egg production, weight, expenses, sales, and more through simple chat. The system tracks performance, flags deviations early, and gives real-time visibility into farm operations.
+Farmers log feed, mortality, egg production, weight, expenses, sales and more through simple chat. The system tracks performance, flags deviations early, and gives real-time visibility into farm operations.
 
 ## Features
 
@@ -41,7 +42,7 @@ Farmers can log feed, mortality, egg production, weight, expenses, sales, and mo
 
 ## Project Structure
 
-```text
+
 farma-assista/
 ├── index.js              # Entry point (Express + bot + scheduler)
 ├── package.json
@@ -54,3 +55,33 @@ farma-assista/
     ├── config/
     ├── utils/
     └── scheduler.js
+
+
+## Key Flows
+
+| Flow | Purpose |
+|------|---------|
+| Onboarding | New farmer setup |
+| Flock creation / close | Manage flocks |
+| Feed / Egg / Mortality / Weight / Litter logging | Daily operational data |
+| Expense & Sales logging | Financial tracking |
+| Drug & Vaccination | Health records |
+| Stock management | Inventory |
+| Health diagnosis | Advisory support |
+| Reports | Performance summaries |
+| Account recovery | Access recovery |
+
+## Design principles
+
+- Chat-first interface for mobile-first users
+- Structured data capture behind natural conversation
+- Early-warning deviation logic against expected benchmarks
+- Clear separation of flows (conversation) and services (business logic)
+
+## Status
+
+Live on Telegram and WhatsApp.
+
+---
+
+**Role:** Design & implementation lead
