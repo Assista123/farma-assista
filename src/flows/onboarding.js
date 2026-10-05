@@ -304,6 +304,22 @@ async function handleOnboardingStep(ctx, session) {
       { parse_mode: 'Markdown' }
     )
 
+    // Send Community Group Invite Button
+    await ctx.reply(
+      `✅ *Registration Complete!*\n\n` +
+      `Welcome, ${farmer.name}! Your farm **${farmer.farm_name}** has been successfully set up. 🎉\n\n` +
+      `Tap the button below to join our Poultry Farmers Community Group and connect with other farmers:`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '👥 Join Farmers Community Group', url: 'https://t.me/+xAXlOiGOvE9iMzBk' }],
+            [{ text: '🏠 Go to Main Menu', callback_data: 'main_menu' }]
+          ]
+        }
+      }
+    )
+
     // Ask about their first flock
     await ctx.reply(
       `${farmer.farm_name} is now registered! 🏡\n\n` +
