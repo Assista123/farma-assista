@@ -3,6 +3,7 @@ const { getFlockById, getBirdAgeDays } = require('../services/flockService')
 const { saveUndoEntry } = require('../utils/undoManager')
 const { saveSession } = require('../utils/sessionManager')
 const { getFeedSummary } = require('../services/feedService')
+const { calculateFlockFCR } = require('../services/fcrService')
 const { mapToNumber } = require('../utils/optionMapper')
 const { suggestNextAction } = require('../utils/nextActionHelper')
 const { askLogDate, handleDateInput, getToday, formatDisplayDate } = require('../utils/dateHelper')
@@ -287,6 +288,27 @@ async function saveWeight(ctx, session) {
       `\n\n💡 Tip: Add your flock breed during setup to get weight benchmarks and performance comparisons.`
   }
 
+  // ── Calculate FCR ──
+  const fcrResult = await calculateFlockFCR(data.flock_id)
+  let fcrMessage = ''
+
+  if (fcrResult && fcrResult.fcr !== null) {
+    let fcrRating = '👍 Good efficiency'
+    if (fcrResult.fcr < 1.4) {
+      fcrRating = '🔥 Excellent conversion!'
+    } else if (fcrResult.fcr > 1.8) {
+      fcrRating = '⚠️ High FCR (Check feed wastage or health)'
+    }
+
+    fcrMessage = 
+      `\n\n📈 **Feed Conversion Ratio (FCR):** ${fcrResult.fcr}\n` +
+      `   *(${fcrRating})*\n` +
+      `   • Total Feed: ${fcrResult.total_consumed_kg}kg\n` +
+      `   • Total Weight Gain: ${fcrResult.total_weight_gain_kg}kg`
+  } else {
+    fcrMessage = `\n\n📈 **Feed Conversion Ratio (FCR):** Pending (Requires active feed logs & weight data)`
+  }
+
   // Check feed logging consistency
   const feedSummary = await getFeedSummary(data.flock_id)
   const noFeedLogged = !feedSummary || feedSummary.total_consumed_kg === 0
@@ -297,7 +319,6 @@ async function saveWeight(ctx, session) {
       `\n\n💡 Note: No feed consumption has been logged for this flock yet. ` +
       `For accurate FCR calculations log daily feed consumption.`
   } else {
-    // Check how many days have been logged vs flock age
     const ageDays = birdAgeDays
     const expectedLogs = ageDays
     const { data: consumptionLogs } = await require('../config/database')
@@ -328,9 +349,11 @@ async function saveWeight(ctx, session) {
     `📅 Age: ${birdAgeDays} days\n` +
     `⚖️ Average weight: ${weight.average_weight_kg}kg` +
     benchmarkMessage +
+    fcrMessage +
     feedWarning +
     (suggestion || ''),
     {
+      parse_mode: 'Markdown',
       reply_markup: {
         keyboard: [
           [{ text: '📋 Daily Logs' }, { text: '💵 Sales & Finance' }],
