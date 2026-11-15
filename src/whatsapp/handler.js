@@ -1,4 +1,4 @@
-const { sendMessage, sendButtons, sendList } = require('./whatsapp')
+const { sendMessage, sendButtons, sendList, clipTitle } = require('./whatsapp')
 const { getSession, saveSession, createNewSession } = require('../utils/sessionManager')
 const { getFarmerByPhone } = require('../services/farmerService')
 const { getActiveFlocks } = require('../services/flockService')
@@ -9,6 +9,10 @@ const supabase = require('../config/database')
 
 // Import all flows
 const { startOnboarding, handleOnboardingStep } = require('../flows/onboarding')
+const { recoverFarmOnWhatsApp } = require('../flows/accountRecovery')
+
+// Matches the tap ("🔄 Recover Existing Farm"), the old shortened title, or typing "recover"
+const RECOVER_TRIGGER = /^(🔄\s*)?recover(\s+existing)?(\s+farm)?$/i
 const { startFlockCreation, handleFlockCreationStep } = require('../flows/flockCreation')
 const { startFeedLogging, handleFeedLoggingStep } = require('../flows/feedLogging')
 const { startMortalityLogging, handleMortalityStep } = require('../flows/mortalityLogging')
@@ -47,9 +51,9 @@ function buildCtx(to) {
           await sendButtons(to, text, actionButtons)
         } else if (actionButtons.length > 3 && actionButtons.length <= 10) {
           // Use WhatsApp list menu
-          const items = actionButtons.map((btn, i) => ({
-            id: `item_${i}`,
-            title: btn.slice(0, 24)
+          const items = actionButtons.map(btn => ({
+            id: Array.from(btn).slice(0, 200).join(''), // full label, read back by the webhook
+            title: clipTitle(btn, 24)
           }))
           await sendList(to, 'Options', text, 'Choose an option', [{
             title: 'Select one',
@@ -112,6 +116,11 @@ async function handleWhatsAppMessage(from, messageText) {
         }))
         await saveSession(farmerId, session)
       } else {
+        // Recovery can be started from any onboarding step, so check it before the step handler
+        if (RECOVER_TRIGGER.test(input)) {
+          await recoverFarmOnWhatsApp(ctx, session, from)
+          return
+        }
         if (session.current_flow === 'ONBOARDING') {
           await handleOnboardingStep(ctx, session)
         } else {

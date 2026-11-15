@@ -112,10 +112,16 @@ app.post('/webhook', async (req, res) => {
           } else if (message.type === 'interactive') {
             // Button or list reply
             const interactive = message.interactive
-            if (interactive?.type === 'button_reply') {
-              text = interactive.button_reply?.title || interactive.button_reply?.id
-            } else if (interactive?.type === 'list_reply') {
-              text = interactive.list_reply?.title || interactive.list_reply?.id
+            const reply =
+              interactive?.type === 'button_reply' ? interactive.button_reply :
+              interactive?.type === 'list_reply' ? interactive.list_reply : null
+            // The ID holds the full label (the title is cut to 20/24 chars).
+            // Old messages sent before this change have generic IDs (btn_0, item_1),
+            // so fall back to the title for those.
+            if (reply?.id && !/^(btn|item)_\d+$/.test(reply.id)) {
+              text = reply.id
+            } else {
+              text = reply?.title || reply?.id
             }
           } else {
             // Voice, image, video, document, location, sticker, etc.
